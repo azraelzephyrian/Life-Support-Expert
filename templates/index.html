@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Life Support Expert System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 40px auto;
+            max-width: 800px;
+            padding: 20px;
+            background: #f9f9f9;
+        }
+        h1 { text-align: center; }
+        label { display: block; margin-top: 15px; }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+        }
+        button {
+            margin-top: 20px;
+            padding: 10px 15px;
+            font-size: 16px;
+        }
+        .results {
+            margin-top: 30px;
+            background: #eef;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .error {
+            color: red;
+            background: #fee;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .crew-table {
+            width: 100%;
+            margin-top: 20px;
+        }
+        .crew-table th, .crew-table td {
+            text-align: left;
+            padding: 5px;
+        }
+    </style>
+    <script>
+        function toggleCO2Options() {
+            const scrubberBox = document.getElementById('use_scrubber');
+            const recyclerBox = document.getElementById('use_recycler');
+
+            // Enforce mutual exclusivity
+            if (scrubberBox.checked) recyclerBox.checked = false;
+            if (recyclerBox.checked) scrubberBox.checked = false;
+
+            document.getElementById('scrubber-fields').style.display = scrubberBox.checked ? 'block' : 'none';
+            document.getElementById('recycler-fields').style.display = recyclerBox.checked ? 'block' : 'none';
+        }
+    </script>
+</head>
+<body>
+    <h1>Spacecraft Life Support Planner</h1>
+
+    <!-- Crew Input -->
+    <form method="POST" action="/add_or_edit_crew">
+        <label for="name">Crew Member Name:</label>
+        <input type="text" name="name" required>
+
+        <label for="mass">Body Mass (kg):</label>
+        <input type="number" step="0.1" name="mass" required>
+
+        <button type="submit">Add/Update Crew Member</button>
+    </form>
+
+    <form method="POST" action="/clear_crew" onsubmit="return confirm('Are you sure you want to clear all crew?');">
+        <button style="background: crimson; color: white;">Clear All Crew</button>
+    </form>
+
+    <!-- Crew Table -->
+    <h2>Crew Roster</h2>
+    <table class="crew-table">
+        <tr><th>Name</th><th>Mass (kg)</th></tr>
+        {% for _, row in crew.iterrows() %}
+            <tr><td>{{ row['name'] }}</td><td>{{ row['mass'] }}</td></tr>
+        {% endfor %}
+    </table>
+
+    <hr>
+
+    <!-- Life Support Input -->
+    <form method="POST">
+        <label for="duration">Mission Duration (days):</label>
+        <input type="number" name="duration" required>
+
+        <label for="activity">Activity Level:</label>
+        <select name="activity" required>
+            <option value="low">Low</option>
+            <option value="moderate">Moderate</option>
+            <option value="daily">Daily Exercise</option>
+        </select>
+
+        <label for="oxygen_tank_weight_per_kg">O₂ Tank Mass per kg (kg):</label>
+        <input type="number" name="oxygen_tank_weight_per_kg" step="0.01" required>
+
+        <label for="weight_limit">Life Support Mass Budget (kg):</label>
+        <input type="number" name="weight_limit" step="0.01" required>
+
+        <!-- Scrubber/Recycler Toggle -->
+        <label>
+            <input type="checkbox" id="use_scrubber" name="use_scrubber" onchange="toggleCO2Options()"> Use CO₂ Scrubber
+        </label>
+        <label>
+            <input type="checkbox" id="use_recycler" name="use_recycler" onchange="toggleCO2Options()"> Use CO₂ Recycler (Sabatier)
+        </label>
+
+        <!-- Scrubber Fields -->
+        <div id="scrubber-fields" style="display:none;">
+            <label for="co2_scrubber_efficiency">Scrubber Efficiency (% CO₂ removed):</label>
+            <input type="number" name="co2_scrubber_efficiency" step="0.1">
+
+            <label for="scrubber_weight_per_kg">Scrubber Mass per kg CO₂ (kg):</label>
+            <input type="number" name="scrubber_weight_per_kg" step="0.01">
+        </div>
+
+        <!-- Recycler Fields -->
+        <div id="recycler-fields" style="display:none;">
+            <label for="co2_recycler_efficiency">Recycler Efficiency (% CO₂ → O₂):</label>
+            <input type="number" name="co2_recycler_efficiency" step="0.1">
+
+            <label for="recycler_weight">Recycler Hardware Weight (kg):</label>
+            <input type="number" name="recycler_weight" step="0.01">
+        </div>
+
+        <button type="submit">Calculate Life Support</button>
+    </form>
+
+    {% if results %}
+        <div class="results">
+            {% if results.error %}
+                <div class="error">{{ results.error }}</div>
+            {% else %}
+                <h2>Life Support Summary</h2>
+                <p><strong>Total O₂ Required:</strong> {{ results.o2_required_kg }} kg</p>
+                <p><strong>O₂ Reclaimed from CO₂:</strong> {{ results.o2_reclaimed }} kg</p>
+                <p><strong>CO₂ Generated:</strong> {{ results.co2_generated }} kg</p>
+                <p><strong>O₂ Tank Mass:</strong> {{ results.o2_tank_mass }} kg</p>
+                <p><strong>Scrubber Mass:</strong> {{ results.scrubber_mass }} kg</p>
+                <p><strong>Recycler Mass:</strong> {{ results.recycler_mass }} kg</p>
+                <p><strong>Total Life Support Mass:</strong> {{ results.total_life_support_mass }} kg</p>
+                <p><strong>Status:</strong>
+                    {% if results.within_limit %}
+                        ✅ Within mass limit!
+                    {% else %}
+                        ❌ Exceeds mass limit.
+                    {% endif %}
+                </p>
+            {% endif %}
+        </div>
+    {% endif %}
+</body>
+</html>
+
