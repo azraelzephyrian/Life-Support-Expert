@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Setup Foods & Beverages</title>
+    <style>
+        body { font-family: Arial; max-width: 1300px; margin: 30px auto; background: #f8f8f8; padding: 20px; }
+        .panel-container { display: flex; gap: 40px; justify-content: space-between; flex-wrap: wrap; }
+        .panel { background: #fff; padding: 15px; border-radius: 6px; flex: 1; min-width: 500px; }
+
+        h2 { margin-top: 0; }
+        label { display: block; margin-top: 10px; }
+        input, select { width: 100%; padding: 8px; margin-top: 5px; }
+        button { margin-top: 15px; padding: 10px 12px; }
+
+        table { width: 100%; margin-top: 20px; border-collapse: collapse; background: #fff; }
+        th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
+        th { background: #eee; }
+
+        .section { margin-top: 40px; }
+    </style>
+</head>
+<body>
+
+    <h1>Food & Beverage Database Editor</h1>
+
+    <div class="panel-container">
+
+        <!-- === FOOD PANEL === -->
+        <div class="panel">
+            <h2>Add or Update Food</h2>
+            <form action="/add_food" method="POST">
+                <label>Food Name:</label>
+                <input type="text" name="name" required>
+
+                <label>Calories per gram:</label>
+                <input type="number" step="0.01" name="calories" required>
+
+                <label>Fat per gram (optional):</label>
+                <input type="number" step="0.01" name="fat">
+
+                <label>Sugar per gram (optional):</label>
+                <input type="number" step="0.01" name="sugar">
+
+                <label>Protein per gram (optional):</label>
+                <input type="number" step="0.01" name="protein">
+
+                <button type="submit">Add or Update Food</button>
+            </form>
+
+            <h2>Rate a Food</h2>
+            <form action="/rate_food" method="POST">
+                <label>Crew Member:</label>
+                <select name="crew_name" required>
+                    {% for member in crew %}
+                        <option value="{{ member }}">{{ member }}</option>
+                    {% endfor %}
+                </select>
+
+                <label>Food:</label>
+                <select name="food_name" required>
+                    {% for food in foods %}
+                        <option value="{{ food.name }}">{{ food.name }}</option>
+                    {% endfor %}
+                </select>
+
+                <label>Rating (1–5):</label>
+                <input type="number" name="rating" min="1" max="5" required>
+
+                <button type="submit">Save Food Rating</button>
+            </form>
+        </div>
+
+        <!-- === BEVERAGE PANEL === -->
+        <div class="panel">
+            <h2>Add or Update Beverage</h2>
+            <form action="/add_beverage" method="POST">
+                <label>Beverage Name:</label>
+                <input type="text" name="name" required>
+
+                <label>Calories per gram:</label>
+                <input type="number" step="0.01" name="calories" required>
+
+                <label>Fat per gram (optional):</label>
+                <input type="number" step="0.01" name="fat">
+
+                <label>Sugar per gram (optional):</label>
+                <input type="number" step="0.01" name="sugar">
+
+                <label>Protein per gram (optional):</label>
+                <input type="number" step="0.01" name="protein">
+
+                <button type="submit">Add or Update Beverage</button>
+            </form>
+
+            <h2>Rate a Beverage</h2>
+            <form action="/rate_beverage" method="POST">
+                <label>Crew Member:</label>
+                <select name="crew_name" required>
+                    {% for member in crew %}
+                        <option value="{{ member }}">{{ member }}</option>
+                    {% endfor %}
+                </select>
+
+                <label>Beverage:</label>
+                <select name="beverage_name" required>
+                    {% for bev in beverages %}
+                        <option value="{{ bev.name }}">{{ bev.name }}</option>
+                    {% endfor %}
+                </select>
+
+                <label>Rating (1–5):</label>
+                <input type="number" name="rating" min="1" max="5" required>
+
+                <button type="submit">Save Beverage Rating</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- === Food Table === -->
+    <div class="section">
+        <h2>All Foods</h2>
+        <table>
+            <tr><th>Name</th><th>Calories/g</th><th>Fat/g</th><th>Sugar/g</th><th>Protein/g</th></tr>
+            {% for food in foods %}
+            <tr>
+                <td>{{ food.name }}</td>
+                <td>{{ food.calories_per_gram }}</td>
+                <td>{{ food.fat_per_gram }}</td>
+                <td>{{ food.sugar_per_gram }}</td>
+                <td>{{ food.protein_per_gram }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+
+    <!-- === Beverage Table === -->
+    <div class="section">
+        <h2>All Beverages</h2>
+        <table>
+            <tr><th>Name</th><th>Calories/g</th><th>Fat/g</th><th>Sugar/g</th><th>Protein/g</th></tr>
+            {% for bev in beverages %}
+            <tr>
+                <td>{{ bev.name }}</td>
+                <td>{{ bev.calories_per_gram }}</td>
+                <td>{{ bev.fat_per_gram }}</td>
+                <td>{{ bev.sugar_per_gram }}</td>
+                <td>{{ bev.protein_per_gram }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+
+    <!-- === Ratings Table === -->
+    <div class="section">
+        <h2>Food Ratings</h2>
+        <table>
+            <tr><th>Crew Member</th><th>Food</th><th>Rating</th></tr>
+            {% for r in food_ratings %}
+            <tr>
+                <td>{{ r.crew_name }}</td>
+                <td>{{ r.food_name }}</td>
+                <td>{{ r.rating }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+
+        <h2>Beverage Ratings</h2>
+        <table>
+            <tr><th>Crew Member</th><th>Beverage</th><th>Rating</th></tr>
+            {% for r in beverage_ratings %}
+            <tr>
+                <td>{{ r.crew_name }}</td>
+                <td>{{ r.beverage_name }}</td>
+                <td>{{ r.rating }}</td>
+            </tr>
+            {% endfor %}
+        </table>
+    </div>
+
+    <form action="/" method="GET" style="margin-top: 30px;">
+        <button>← Back to Life Support</button>
+    </form>
+
+</body>
+<form action="/" method="GET">
+    <button type="start">Edit Food Database →</button>
+</form>
+<form action="/upload_food_csv" method="GET">
+    <button>Upload Food CSV →</button>
+</form>
+<form action="/beverage_upload" method="GET">
+    <button>Upload Beverage CSV →</button>
+</form>
+<form action="/meal_log" method="GET">
+    <button>📅 View Meal Log from Database</button>
+</form>
+</html>

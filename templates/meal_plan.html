@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Meal Plan Schedule</title>
+    <style>
+        body { font-family: Arial; max-width: 1100px; margin: 30px auto; background: #f8f8f8; padding: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 40px; background: #fff; }
+        th, td { padding: 8px 12px; border: 1px solid #ccc; }
+        th { background: #e0e0e0; }
+        h2 { margin-top: 40px; }
+        .warn { background: #ffe8e8; }
+        .okay { background: #e0ffe0; }
+    </style>
+</head>
+<body>
+    <h1>Meal Schedule (Mass Budget = {{ total_mass_budget }} kg)</h1>
+
+    {% for result in results %}
+        <h2>{{ result.crew_member }} ({{ result.sufficiency_status|capitalize }}, Ration: {{ result.ration_fraction*100|round(1) }}%)</h2>
+
+        <p>
+            Total food mass: {{ result.total_food_mass }} g<br>
+            Total beverage mass: {{ result.total_beverage_mass }} g<br>
+            <strong>Total: {{ result.total_mass }} g</strong><br>
+            Calorie Target: {{ result.calorie_target }} kcal<br>
+            Rationed Intake: {{ result.rationed_kcal }} kcal ({{ result.intake_ratio*100|round(1) }}%)
+            {% if result.warning %}
+                <br><span class="warn">⚠ {{ result.warning }}</span>
+            {% endif %}
+        </p>
+
+        <table>
+            <tr>
+                <th>Day</th><th>Meal</th><th>Food</th><th>Grams</th><th>Beverage</th><th>Grams</th>
+            </tr>
+            {% for meal in result.schedule %}
+                <tr class="{{ 'warn' if result.sufficiency_status != 'sufficient' else 'okay' }}">
+                    <td>{{ meal.day }}</td>
+                    <td>{{ meal.meal }}</td>
+                    <td>{{ meal.food }}</td>
+                    <td>{{ meal.food_grams }}</td>
+                    <td>{{ meal.beverage }}</td>
+                    <td>{{ meal.beverage_grams }}</td>
+                </tr>
+            {% endfor %}
+        </table>
+    {% endfor %}
+
+    <form action="/" method="GET">
+        <button>← Back to Life Support</button>
+    </form>
+</body>
+<form action="/" method="GET">
+    <button type="start">Edit Food Database →</button>
+</form>
+<form action="/setup_foods" method="GET">
+    <button type="submit">Edit Food Database →</button>
+</form>
+<form action="/upload_food_csv" method="GET">
+    <button>Upload Food CSV →</button>
+</form>
+<form action="/meal_log" method="GET">
+    <button>📅 View Meal Log from Database</button>
+</form>
+</html>

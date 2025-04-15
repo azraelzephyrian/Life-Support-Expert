@@ -59,6 +59,138 @@ def delete_by_id(db_path, table_name, student_id):
     conn.commit()
     conn.close()
 
+def get_latest_remaining_mass_budget(gas_db_path='gas_budget.db'):
+    conn = sqlite3.connect(gas_db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT weight_limit, total_gas_mass
+        FROM gas_masses
+        ORDER BY timestamp DESC
+        LIMIT 1
+    """)
+    row = cursor.fetchone()
+    conn.close()
+    if row:
+        weight_limit, gas_mass = row
+        return round(weight_limit - gas_mass, 2)
+    return None
+
+def get_all_nutrition_data(food_path='nutrition.db', beverage_path='beverage.db'):
+    import pandas as pd
+    food_conn = sqlite3.connect(food_path)
+    bev_conn = sqlite3.connect(beverage_path)
+
+    food_df = pd.read_sql("SELECT * FROM foods", food_conn)
+    food_ratings = pd.read_sql("SELECT * FROM food_ratings", food_conn)
+
+    beverage_df = pd.read_sql("SELECT * FROM beverages", bev_conn)
+    beverage_ratings = pd.read_sql("SELECT * FROM beverage_ratings", bev_conn)
+
+    food_conn.close()
+    bev_conn.close()
+
+    return food_df, beverage_df, food_ratings, beverage_ratings
+
+def init_beverage_db(db_path='beverage.db'):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS beverages (
+            name TEXT PRIMARY KEY,
+            calories_per_gram REAL NOT NULL,
+            fat_per_gram REAL DEFAULT 0,
+            sugar_per_gram REAL DEFAULT 0,
+            protein_per_gram REAL DEFAULT 0
+        );
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS beverage_ratings (
+            crew_name TEXT,
+            beverage_name TEXT,
+            rating INTEGER,
+            PRIMARY KEY (crew_name, beverage_name)
+        );
+    """)
+
+    conn.commit()
+    conn.close()
+
+def init_nutrition_db(db_path='nutrition.db'):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS foods (
+            name TEXT PRIMARY KEY,
+            calories_per_gram REAL NOT NULL,
+            fat_per_gram REAL DEFAULT 0,
+            sugar_per_gram REAL DEFAULT 0,
+            protein_per_gram REAL DEFAULT 0
+        );
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS food_ratings (
+            crew_name TEXT,
+            food_name TEXT,
+            rating INTEGER,
+            PRIMARY KEY (crew_name, food_name)
+        );
+    """)
+    conn.commit()
+    conn.close()
+
+def insert_daily_meals(db_path, meals: list):
+    """
+    Insert a list of meal dicts into the daily_meals table.
+    Each dict must include: crew_name, day, meal, food_name, food_grams, etc.
+    """
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # Ensure the table exists
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS daily_meals (
+            crew_name TEXT,
+            day INTEGER,
+            meal INTEGER,
+            food_name TEXT,
+            food_grams REAL,
+            food_rating TEXT,
+            beverage_name TEXT,
+            beverage_grams REAL,
+            beverage_rating TEXT,
+            PRIMARY KEY (crew_name, day, meal)
+        );
+    """)
+
+    for m in meals:
+        cursor.execute("""
+            INSERT OR REPLACE INTO daily_meals (
+                crew_name, day, meal,
+                food_name, food_grams, food_rating,
+                beverage_name, beverage_grams, beverage_rating
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
+        """, (
+            m['crew_name'], m['day'], m['meal'],
+            m['food_name'], m['food_grams'], m.get('food_rating', None),
+            m['beverage_name'], m['beverage_grams'], m.get('beverage_rating', None)
+        ))
+
+    conn.commit()
+    conn.close()
+
+
+def get_latest_duration_from_gas_budget(db_path='gas_budget.db'):
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("SELECT duration FROM gas_masses ORDER BY timestamp DESC LIMIT 1")
+    result = cursor.fetchone()
+    conn.close()
+    return int(result[0]) if result else 7  # fallback to 7 if no entry
+
 def insert_gas_budget(db_path, data: dict):
     """
     Insert a new gas budget record into the gas_masses table.
@@ -89,7 +221,8 @@ def insert_gas_budget(db_path, data: dict):
             scrubber_weight_per_kg REAL,
             co2_recycler_efficiency REAL,
             recycler_weight REAL,
-            within_limit BOOLEAN
+            within_limit BOOLEAN,
+            weight_limit REAL
         );
     """)
 

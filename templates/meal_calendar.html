@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Meal Calendar</title>
+    <style>
+        body { font-family: Arial; max-width: 1200px; margin: 30px auto; background: #f9f9f9; padding: 20px; }
+        h2 { margin-top: 40px; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; background: white; }
+        th, td { padding: 8px; border: 1px solid #ccc; text-align: center; }
+        th { background: #ddd; }
+        .meal-box { padding: 5px; }
+        .meal-box small { display: block; font-size: 0.85em; color: #555; }
+    </style>
+</head>
+<body>
+    <h1>Meal Calendar with Preferences (from Database)</h1>
+
+    {% for entry in calendar_data %}
+        <h2>{{ entry.crew }}</h2>
+        <table>
+            <tr>
+                <th>Day</th>
+                <th>Meal</th>
+                <th>Food</th>
+                <th>Food Mass (g)</th>
+                <th>Preference</th>
+                <th>Beverage</th>
+                <th>Beverage (g)</th>
+                <th>Beverage Preference</th>
+            </tr>
+            {% for meal in entry.schedule %}
+                <tr>
+                    <td>{{ meal.day }}</td>
+                    <td>
+                        {% if meal.meal == 1 %}Breakfast
+                        {% elif meal.meal == 2 %}Lunch
+                        {% else %}Dinner{% endif %}
+                    </td>
+                    <td>{{ meal.food_name }}</td>
+                    <td>{{ meal.food_grams }}</td>
+                    <td>{{ meal.food_rating }}</td>
+                    <td>{{ meal.beverage_name }}</td>
+                    <td>{{ meal.beverage_grams }}</td>
+                    <td>{{ meal.beverage_rating }}</td>
+                </tr>
+            {% endfor %}
+        </table>
+    {% endfor %}
+
+    <form action="/" method="GET">
+        <button>← Back to Life Support</button>
+    </form>
+    <form action="/setup_foods" method="GET">
+        <button>Edit Food Database →</button>
+    </form>
+</body>
+</html>

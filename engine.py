@@ -100,7 +100,9 @@ class LifeSupportEngine(KnowledgeEngine):
                 'scrubber_weight_per_kg': scrubber_weight_per_kg,
                 'co2_recycler_efficiency': co2_recycler_efficiency,
                 'recycler_weight': recycler_weight,
-                'within_limit': total_mass <= weight_limit
+                'within_limit': total_mass <= weight_limit,
+                'weight_limit': weight_limit,
+                'crew_count': crew_count,
             }
         )
 

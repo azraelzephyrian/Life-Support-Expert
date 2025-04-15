@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Upload Beverage CSV</title>
+    <style>
+        body { font-family: Arial; max-width: 800px; margin: 30px auto; background: #f9f9f9; padding: 20px; }
+        form { background: white; padding: 20px; border-radius: 8px; }
+        input[type="file"] { margin-top: 10px; }
+        button { margin-top: 20px; padding: 10px 15px; }
+    </style>
+</head>
+<body>
+    <h1>Upload Beverage CSV</h1>
+    <p><strong>Required columns:</strong> name, calories_per_gram<br>
+       <strong>Optional:</strong> fat_per_gram, sugar_per_gram, protein_per_gram</p>
+
+    <form action="/upload_beverage_csv" method="POST" enctype="multipart/form-data">
+        <label>Select CSV File:</label><br>
+        <input type="file" name="csv_file" accept=".csv" required><br>
+        <button type="submit">Upload Beverages</button>
+    </form>
+
+    <form action="/setup_foods" method="GET">
+        <button style="margin-top: 20px;">← Back to Setup Page</button>
+    </form>
+</body>
+<form action="/" method="GET">
+    <button type="start">Edit Food Database →</button>
+</form>
+<form action="/meal_log" method="GET">
+    <button>📅 View Meal Log from Database</button>
+</form>
+</html>
