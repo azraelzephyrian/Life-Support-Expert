@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>Life Support Expert System</title>
+    <title>(Space Picnic Planner)</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -100,12 +101,36 @@
         </select>
 
         <label for="oxygen_tank_weight_per_kg">O₂ Tank Mass per kg (kg):</label>
-        <input type="number" name="oxygen_tank_weight_per_kg" step="0.01" required>
+        <input type="number" name="oxygen_tank_weight_per_kg" value = "1.2" step="0.01" required>
+
+        <label for="nitrogen_tank_weight_per_kg">N₂ Tank Mass per kg (kg):</label>
+        <input type="number" name="nitrogen_tank_weight_per_kg" value = "1.2" step="0.01" required>
+
+        <label for="hygiene_water_per_day">Hygiene Water per Crew per Day (g):</label>
+        <input type="number" name="hygiene_water_per_day" value="1500" required>
+
+        <div id="water-recycler-fields" style="display:none;">
+        <label for="water_recycler_efficiency">Water Recycler Efficiency (%):</label>
+        <input type="number" name="water_recycler_efficiency" value = "85" step="1">
+        <label for="water_recycler_mass">Water Recycler Hardware Weight (kg):</label>
+        <input type="number" name="water_recycler_weight" value = "450" step="0.01">
+        </div>
+
+        <script>
+        document.getElementById('use_water_recycler').addEventListener('change', function() {
+            document.getElementById('water-recycler-fields').style.display = this.checked ? 'block' : 'none';
+        });
+        </script>
+
 
         <label for="weight_limit">Life Support Mass Budget (kg):</label>
         <input type="number" name="weight_limit" step="0.01" required>
 
         <!-- Scrubber/Recycler Toggle -->
+        <label>
+            <input type="checkbox" id="use_water_recycler" name="use_water_recycler">
+            Use Water Recycler
+        </label>
         <label>
             <input type="checkbox" id="use_scrubber" name="use_scrubber" onchange="toggleCO2Options()"> Use CO₂ Scrubber
         </label>
@@ -115,6 +140,43 @@
 
         <!-- Scrubber Fields -->
         <div id="scrubber-fields" style="display:none;">
+            <h3>📊 Scrubber Reference Table</h3>
+            <table border="1" cellpadding="8" style="border-collapse: collapse; margin-top: 10px;">
+            <thead>
+                <tr style="background-color: #eef;">
+                <th>Scrubber Type</th>
+                <th>CO₂ Removal Efficiency (%)</th>
+                <th>CO₂ Absorption Capacity<br>(kg CO₂ / kg scrubber)</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                <td>Amine-Based (MEA)</td>
+                <td>95–99%</td>
+                <td>0.4–0.6</td>
+                </tr>
+                <tr>
+                <td>Zeolite-Based</td>
+                <td>85–95%</td>
+                <td>0.2–0.3</td>
+                </tr>
+                <tr>
+                <td>Soda Lime</td>
+                <td>80–90%</td>
+                <td>0.2–0.3</td>
+                </tr>
+                <tr>
+                <td>Activated Carbon</td>
+                <td>30–60%</td>
+                <td>0.1–0.2</td>
+                </tr>
+                <tr>
+                <td>Solid Amine-Based</td>
+                <td>90–98%</td>
+                <td>0.3–0.5</td>
+                </tr>
+            </tbody>
+            </table>
             <label for="co2_scrubber_efficiency">Scrubber Efficiency (% CO₂ removed):</label>
             <input type="number" name="co2_scrubber_efficiency" step="0.1">
 
@@ -125,10 +187,10 @@
         <!-- Recycler Fields -->
         <div id="recycler-fields" style="display:none;">
             <label for="co2_recycler_efficiency">Recycler Efficiency (% CO₂ → O₂):</label>
-            <input type="number" name="co2_recycler_efficiency" step="0.1">
+            <input type="number" name="co2_recycler_efficiency" value = "50" step="0.1">
 
             <label for="recycler_weight">Recycler Hardware Weight (kg):</label>
-            <input type="number" name="recycler_weight" step="0.01">
+            <input type="number" name="recycler_weight" value = "10" step="0.01">
         </div>
 
         <button type="submit">Calculate Life Support</button>
@@ -145,8 +207,17 @@
                 <p><strong>CO₂ Generated:</strong> {{ results.co2_generated }} kg</p>
                 <p><strong>O₂ Tank Mass:</strong> {{ results.o2_tank_mass }} kg</p>
                 <p><strong>Scrubber Mass:</strong> {{ results.scrubber_mass }} kg</p>
-                <p><strong>Recycler Mass:</strong> {{ results.recycler_mass }} kg</p>
-                <p><strong>Total Life Support Mass:</strong> {{ results.total_life_support_mass }} kg</p>
+                <p><strong>Sabatier Recycler Mass:</strong> {{ results.recycler_mass }} kg</p>
+                <p><strong>Total N₂ Required:</strong> {{ results.n2_required_kg }} kg</p>
+                <p><strong>N₂ Tank Mass:</strong> {{ results.n2_tank_mass }} kg</p>
+                <p><strong>Water (Hygiene Use Only):</strong> {{ results.water_hygiene_raw }} g</p>
+                <p><strong>Water (Excreted from Meals):</strong> {{ results.water_excretion }} g</p>
+                <p><strong>Water Recovered:</strong> {{ results.water_recovered }} g</p>
+                <p><strong>Water Recycler Mass:</strong> {{ results.water_recycler_mass }} kg</p>
+                <p><strong>Net Water Mass Needed:</strong> {{ results.water_net }} g</p>
+                <p><strong>Gas and Water Mass:</strong> {{ results.get('total_life_support_mass', 'N/A') }} kg</p>
+                <p><strong>Cumulative Meal and Beverage Mass:</strong> {{ results.cumulative_meal_mass }} kg</p>
+                <p><strong>Combined Life Support Mass:</strong> {{ results.combined_life_support_mass }} kg</p>
                 <p><strong>Status:</strong>
                     {% if results.within_limit %}
                         ✅ Within mass limit!
@@ -161,8 +232,8 @@
 <form action="/setup_foods" method="GET">
     <button type="submit">Edit Food Database →</button>
 </form>
-<form action="/meal_calendar" method="GET">
-    <button>View Calendar Schedule →</button>
+<form action="/meal_log" method="GET">
+    <button>📅 View Meal Log from Database</button>
 </form>
 </html>
 

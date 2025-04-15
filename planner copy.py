@@ -49,17 +49,6 @@ class MealPlanner(KnowledgeEngine):
         self.ration_fraction = ration_fraction
         self.prev_foods = set()
         self.prev_beverages = set()
-        # Tracks (day, meal index) → (food, beverage)
-        self.history_by_slot = {}  # {(day, meal): (food, bev)}
-
-        # Track list of last 6 food and bev choices (updated on finalize)
-        self.last_6_items = []
-
-        # Track last assigned food/bev
-        self.last_food = None
-        self.last_bev = None
-
-
 
         # ✅ Store the raw rating dictionaries
         self.food_ratings = {k.lower(): v for k, v in food_ratings.items()}
@@ -70,7 +59,7 @@ class MealPlanner(KnowledgeEngine):
             name = f.get('food_name') or f.get('name')
             if name:
                 rating = self.food_ratings.get(name.lower())
-                if rating is not None and rating > 1:
+                if rating is not None:
                     f['food_name'] = name
                     f['rating'] = rating
                     self.foods.append(f)
@@ -80,7 +69,7 @@ class MealPlanner(KnowledgeEngine):
             name = b.get('beverage_name') or b.get('name')
             if name:
                 rating = self.beverage_ratings.get(name.lower())
-                if rating is not None and rating > 1:
+                if rating is not None:
                     b['beverage_name'] = name
                     b['rating'] = rating
                     self.beverages.append(b)
@@ -125,31 +114,6 @@ class MealPlanner(KnowledgeEngine):
             upto += f[weight_key]
         return candidates[-1]
 
-    def is_food_allowed(self, food_name, day, meal):
-        # 🚫 No immediate repeat
-        if food_name == self.last_food:
-            return False
-
-        # 🚫 No same-slot repeat from previous day
-        if (day - 1, meal) in self.history_by_slot:
-            if self.history_by_slot[(day - 1, meal)][0] == food_name:
-                return False
-
-        # 🚫 No recent 6-meal repeats
-        if food_name in self.last_6_items:
-            return False
-
-        return True
-
-    def is_bev_allowed(self, bev_name, day, meal):
-        if bev_name == self.last_bev:
-            return False
-        if (day - 1, meal) in self.history_by_slot:
-            if self.history_by_slot[(day - 1, meal)][1] == bev_name:
-                return False
-        if bev_name in self.last_6_items:
-            return False
-        return True
 
     @Rule(
         MealSlot(day=MATCH.day, meal=MATCH.meal, crew_name=MATCH.name),
@@ -162,26 +126,25 @@ class MealPlanner(KnowledgeEngine):
         if self.slot_already_assigned(SelectedFood, day, meal):
             return
 
-        # Filter with Python logic
-        candidates = [
-            f for f in self.foods
-            if f['rating'] > 1 and self.is_food_allowed(f['food_name'], day, meal)
-        ]
+        # Prefer unrated items not recently used
+        candidates = [f for f in self.foods if f['food_name'] != last_food]
 
-        if not candidates:
-            return  # Nothing legal to choose
+        # Filter out recently used foods (except when pool is small)
+        if len(candidates) > 5:
+            candidates = [f for f in candidates if f['food_name'] not in self.prev_foods] or candidates
 
+        # Pick one with weighted preference
         chosen = self.weighted_choice(candidates, 'rating')
         grams = round(self.per_meal_kcal / chosen['calories_per_gram'], 2)
 
-        self.last_food = chosen['food_name']
+        self.prev_foods.add(chosen['food_name'])
         self.declare(SelectedFood(
             food=chosen['food_name'],
             food_grams=grams,
             day=day,
             meal=meal
         ))
-
+        pass
 
 
 
@@ -196,24 +159,21 @@ class MealPlanner(KnowledgeEngine):
         if self.slot_already_assigned(SelectedBeverage, day, meal):
             return
 
-        candidates = [
-            b for b in self.beverages
-            if b['rating'] > 1 and self.is_bev_allowed(b['beverage_name'], day, meal)
-        ]
+        candidates = [b for b in self.beverages if b['beverage_name'] != last_bev]
 
-        if not candidates:
-            return
+        # Reduce repeats if possible
+        if len(candidates) > 3:
+            candidates = [b for b in candidates if b['beverage_name'] not in self.prev_beverages] or candidates
 
         chosen = self.weighted_choice(candidates, 'rating')
 
-        self.last_bev = chosen['beverage_name']
+        self.prev_beverages.add(chosen['beverage_name'])
         self.declare(SelectedBeverage(
             beverage=chosen['beverage_name'],
             beverage_grams=self.water_per_meal,
             day=day,
             meal=meal
         ))
-
 
 
 
@@ -236,16 +196,6 @@ class MealPlanner(KnowledgeEngine):
         })
         self.modify(history, last_food=food, last_bev=bev)
         self.declare(MealAssigned(crew_name=name, day=day, meal=meal))
-
-        # Record for full schedule history
-        self.history_by_slot[(day, meal)] = (food, bev)
-
-        # Maintain last-6 history sliding window
-        self.last_6_items.append(food)
-        self.last_6_items.append(bev)
-        if len(self.last_6_items) > 12:  # 6 meals × 2 items
-            self.last_6_items = self.last_6_items[-12:]
-
         self.retract(food_f)
         self.retract(bev_f)
         self.retract(slot)

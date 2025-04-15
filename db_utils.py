@@ -222,13 +222,43 @@ def insert_gas_budget(db_path, data: dict):
             co2_recycler_efficiency REAL,
             recycler_weight REAL,
             within_limit BOOLEAN,
-            weight_limit REAL
+            weight_limit REAL,
+
+            -- New fields
+            nitrogen_tank_weight_per_kg REAL,
+            n2_required_kg REAL,
+            n2_tank_mass REAL,
+            hygiene_water_per_day REAL,
+            water_hygiene_raw REAL,
+            water_excretion REAL,
+            water_recovered REAL,
+            water_net REAL,
+            use_water_recycler BOOLEAN,
+            water_recycler_efficiency REAL,
+            cumulative_meal_mass REAL,
+            combined_life_support_mass REAL,
+            'water_recycler_mass' REAL
+
         );
     """)
 
+    # Insert dynamic keys
     columns = ', '.join(data.keys())
     placeholders = ', '.join(['?'] * len(data))
     query = f"INSERT INTO gas_masses ({columns}) VALUES ({placeholders})"
     cursor.execute(query, tuple(data.values()))
     conn.commit()
     conn.close()
+
+def get_cumulative_meal_mass(meal_db_path='meal_schedule.db'):
+    import sqlite3
+    try:
+        conn = sqlite3.connect(meal_db_path)
+        cursor = conn.cursor()
+        cursor.execute("SELECT SUM(food_grams + beverage_grams) FROM daily_meals")
+        result = cursor.fetchone()[0]
+        conn.close()
+        return round(result / 1000.0, 2) if result else 0.0  # grams → kg
+    except Exception as e:
+        print(f"Error calculating cumulative meal mass: {e}")
+        return 0.0

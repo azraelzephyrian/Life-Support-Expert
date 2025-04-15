@@ -8,7 +8,7 @@ from db_utils import fetch_all_records, get_all_nutrition_data  # assume these a
 import sqlite3
 import pandas as pd 
 from db_utils import init_nutrition_db, init_beverage_db, insert_daily_meals
-from db_utils import get_latest_duration_from_gas_budget
+from db_utils import get_latest_duration_from_gas_budget, get_cumulative_meal_mass
 
 
 # Call this early in app.py (e.g., after defining your app object)
@@ -46,6 +46,13 @@ def index():
             # Recycler params
             co2_recycler_efficiency = float(request.form.get('co2_recycler_efficiency') or 0)
             recycler_weight = float(request.form.get('recycler_weight') or 0)
+            water_recycler_weight = float(request.form.get('water_recycler_weight') or 0)
+
+            # New nitrogen and water parameters
+            nitrogen_tank_weight_per_kg = float(request.form.get('nitrogen_tank_weight_per_kg') or 0)
+            hygiene_water_per_day = float(request.form.get('hygiene_water_per_day') or 0)
+            use_water_recycler = request.form.get('use_water_recycler') == 'on'
+            water_recycler_efficiency = float(request.form.get('water_recycler_efficiency') or 0)
 
             body_masses = [float(mass) for mass in crew_records['mass'].tolist()]
             crew_count = len(body_masses)
@@ -67,7 +74,12 @@ def index():
                 co2_scrubber_efficiency=co2_scrubber_efficiency,
                 scrubber_weight_per_kg=scrubber_weight_per_kg,
                 co2_recycler_efficiency=co2_recycler_efficiency,
-                recycler_weight=recycler_weight
+                recycler_weight=recycler_weight,
+                nitrogen_tank_weight_per_kg=nitrogen_tank_weight_per_kg,
+                hygiene_water_per_day=hygiene_water_per_day,
+                use_water_recycler=use_water_recycler,
+                water_recycler_efficiency=water_recycler_efficiency,
+                water_recycler_weight=water_recycler_weight
             ))
 
             print("FACTS BEING DECLARED:")
@@ -83,16 +95,28 @@ def index():
                 "co2_scrubber_efficiency": co2_scrubber_efficiency,
                 "scrubber_weight_per_kg": scrubber_weight_per_kg,
                 "co2_recycler_efficiency": co2_recycler_efficiency,
-                "recycler_weight": recycler_weight
+                "recycler_weight": recycler_weight,
+                "nitrogen_tank_weight_per_kg": nitrogen_tank_weight_per_kg,
+                "hygiene_water_per_day": hygiene_water_per_day,
+                "use_water_recycler": use_water_recycler,
+                "water_recycler_efficiency": water_recycler_efficiency
             })
 
             engine.run()
             results = engine.results
 
+            if 'error' not in results:
+                meal_mass = get_cumulative_meal_mass()
+                results['water_recycler_mass'] = round(water_recycler_weight, 2)
+                results['cumulative_meal_mass'] = meal_mass
+                results['combined_life_support_mass'] = round(results['total_life_support_mass'] + meal_mass, 2)
+     
+
         except Exception as e:
             results = {'error': str(e)}
 
     return render_template('index.html', results=results, crew=crew_records)
+
 
 @app.route('/add_or_edit_crew', methods=['POST'])
 def add_or_edit_crew():
