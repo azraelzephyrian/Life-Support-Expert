@@ -183,7 +183,18 @@
         <h1>🚀Spacecraft Life Support Planner🌎</h1>
     </div>
     
-
+    <div style="position: fixed; top: 20px; right: 40px; z-index: 20;">
+        <select onchange="if (this.value) window.location.href=this.value;" style="padding: 8px; border-radius: 6px; background-color: #111; color: #fff; font-family: 'Orbitron', sans-serif; box-shadow: 0 0 6px rgba(255,255,255,0.2);">
+            <option value="">🌐 Navigate to...</option>
+            <option value="/">🏠 Home</option>
+            <option value="/meal_log">📅 Meal Log</option>
+            <option value="/setup_foods">🥗 Food & Beverage Setup</option>
+            <option value="/upload_food_csv">📤 Upload Food CSV</option>
+            <option value="/beverage_upload">📤 Upload Beverage CSV</option>
+            <option value="/clear_all_databases">💾 Reset All Databases</option>
+        </select>
+    </div>
+    
     <!-- Crew Input -->
     <form method="POST" action="/add_or_edit_crew">
         <label for="name">Crew Member Name:</label>
@@ -364,6 +375,13 @@
             🧨 Clear Gas Budget Database
         </button>
     </form>
+
+    <form action="/clear_all_databases" method="POST" onsubmit="return confirm('Clear ALL databases? This cannot be undone!');">
+        <button type="submit" style="background-color: crimson; color: white; padding: 10px;">
+            💾 Reset ALL Databases
+        </button>
+    </form>
+    
     <form action="{{ url_for('ration_meal_database') }}" method="post" style="margin-top: 20px;">
         <button type="submit" style="padding: 10px 20px; font-size: 16px;">
             🍽️ Apply Rationing and Refresh

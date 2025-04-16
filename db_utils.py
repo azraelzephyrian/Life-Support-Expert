@@ -269,7 +269,6 @@ def insert_daily_meals(db_path, meals: list, sufficiency_map: dict):
     for crew_name, summary in sufficiency_map.items():
         status = summary['status']
         ratio = summary['intake_ratio']
-        print(f"🚀 Inserting sufficiency for {crew_name}: {status}, {ratio}")
         cursor.execute("""
             INSERT OR REPLACE INTO crew_sufficiency (
                 crew_name, sufficiency_status, intake_ratio

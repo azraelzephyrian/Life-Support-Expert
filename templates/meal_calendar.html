@@ -220,6 +220,19 @@
 <body>
     <img id="cupola-frame" src="{{ url_for('static', filename='images/cupola-audio-terminal-unit.png') }}" alt="Cupola Frame Overlay">
     <img id="floating-astro" src="{{ url_for('static', filename='images/Bruce_McCandless_II_during_EVA_in_1984.png') }}" alt="Astronaut Floating">
+        
+    <div style="position: fixed; top: 20px; right: 40px; z-index: 20;">
+        <select onchange="if (this.value) window.location.href=this.value;" style="padding: 8px; border-radius: 6px; background-color: #111; color: #fff; font-family: 'Orbitron', sans-serif; box-shadow: 0 0 6px rgba(255,255,255,0.2);">
+            <option value="">🌐 Navigate to...</option>
+            <option value="/">🏠 Home</option>
+            <option value="/meal_log">📅 Meal Log</option>
+            <option value="/setup_foods">🥗 Food & Beverage Setup</option>
+            <option value="/upload_food_csv">📤 Upload Food CSV</option>
+            <option value="/beverage_upload">📤 Upload Beverage CSV</option>
+            <option value="/clear_all_databases">💾 Reset All Databases</option>
+        </select>
+    </div>
+    
     <form action="/regenerate_meals" method="POST" onsubmit="return confirm('Are you sure you want to regenerate all meals? This will overwrite the current meal schedule.')">
         <button type="submit">🔁 Regenerate Meals</button>
     </form>  

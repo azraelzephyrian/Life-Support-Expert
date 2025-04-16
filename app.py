@@ -23,6 +23,151 @@ init_db(DB_PATH, TABLE_NAME, SCHEMA, PRIMARY_KEY)
 init_nutrition_db('nutrition.db')
 init_beverage_db('beverage.db')
 
+from flask import Flask, redirect, url_for
+import sqlite3
+
+app = Flask(__name__)
+
+@app.route('/clear_all_databases', methods=['POST'])
+def clear_all_databases():
+    def reset_db(path, commands):
+        conn = sqlite3.connect(path)
+        cursor = conn.cursor()
+        for cmd in commands:
+            cursor.execute(cmd)
+        conn.commit()
+        conn.close()
+
+    # === nutrition.db ===
+    reset_db('nutrition.db', [
+        "DROP TABLE IF EXISTS foods;",
+        "DROP TABLE IF EXISTS food_ratings;",
+        """
+        CREATE TABLE foods (
+            name TEXT PRIMARY KEY,
+            calories_per_gram REAL,
+            fat_per_gram REAL,
+            sugar_per_gram REAL,
+            protein_per_gram REAL
+        );
+        """,
+        """
+        CREATE TABLE food_ratings (
+            crew_name TEXT,
+            food_name TEXT,
+            rating INTEGER
+        );
+        """
+    ])
+
+    # === beverage.db ===
+    reset_db('beverage.db', [
+        "DROP TABLE IF EXISTS beverages;",
+        "DROP TABLE IF EXISTS beverage_ratings;",
+        """
+        CREATE TABLE beverages (
+            name TEXT PRIMARY KEY,
+            calories_per_gram REAL,
+            fat_per_gram REAL,
+            sugar_per_gram REAL,
+            protein_per_gram REAL
+        );
+        """,
+        """
+        CREATE TABLE beverage_ratings (
+            crew_name TEXT,
+            beverage_name TEXT,
+            rating INTEGER
+        );
+        """
+    ])
+
+    # === astronauts.db ===
+    reset_db('astronauts.db', [
+        "DROP TABLE IF EXISTS crew;",
+        """
+        CREATE TABLE crew (
+            name TEXT PRIMARY KEY,
+            mass REAL
+        );
+        """
+    ])
+
+    # === meal_schedule.db ===
+    reset_db('meal_schedule.db', [
+        "DROP TABLE IF EXISTS daily_meals;",
+        "DROP TABLE IF EXISTS crew_sufficiency;",
+        """
+        CREATE TABLE daily_meals (
+            crew_name TEXT,
+            day INTEGER,
+            meal INTEGER,
+            food_name TEXT,
+            food_grams REAL,
+            food_rating TEXT,
+            beverage_name TEXT,
+            beverage_grams REAL,
+            beverage_rating TEXT,
+            PRIMARY KEY (crew_name, day, meal)
+        );
+        """,
+        """
+        CREATE TABLE crew_sufficiency (
+            crew_name TEXT PRIMARY KEY,
+            sufficiency_status TEXT,
+            intake_ratio REAL
+        );
+        """
+    ])
+
+    # === gas_budget.db ===
+    reset_db('gas_budget.db', [
+        "DROP TABLE IF EXISTS gas_masses;",
+        """
+        CREATE TABLE gas_masses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT,
+            duration INTEGER,
+            crew_count INTEGER,
+            body_masses TEXT,
+            activity TEXT,
+            oxygen_tank_weight_per_kg REAL,
+            co2_generated REAL,
+            o2_required_kg REAL,
+            o2_reclaimed REAL,
+            o2_tank_mass REAL,
+            scrubber_mass REAL,
+            recycler_mass REAL,
+            total_gas_mass REAL,
+            use_scrubber BOOLEAN,
+            use_recycler BOOLEAN,
+            co2_scrubber_efficiency REAL,
+            scrubber_weight_per_kg REAL,
+            co2_recycler_efficiency REAL,
+            recycler_weight REAL,
+            within_limit BOOLEAN,
+            weight_limit REAL,
+            nitrogen_tank_weight_per_kg REAL,
+            n2_required_kg REAL,
+            n2_tank_mass REAL,
+            hygiene_water_per_day REAL,
+            water_hygiene_raw REAL,
+            water_excretion REAL,
+            water_recovered REAL,
+            water_net REAL,
+            use_water_recycler BOOLEAN,
+            water_recycler_efficiency REAL,
+            cumulative_meal_mass REAL,
+            combined_life_support_mass REAL,
+            water_recycler_mass REAL,
+            total_life_support_mass REAL,
+            base_weight_limit REAL
+        );
+        """
+    ])
+
+    print("🧼 All databases cleared and schemas recreated.")
+    return redirect(url_for('index'))
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
@@ -531,7 +676,16 @@ def meal_log():
     if current_rows < total_meals_expected:
         print("📅 Generating missing meal plans...")
         food_df, beverage_df, food_ratings, beverage_ratings = get_all_nutrition_data()
-        mass_budget = get_latest_remaining_mass_budget()
+        try:
+            mass_budget = get_latest_remaining_mass_budget()
+        except ValueError as e:
+            print(str(e))
+            # Option 1: Render a friendly template with no meals
+            return render_template('meal_calendar.html', calendar_data=[], sufficiency_map={})
+            
+            # Option 2: Redirect or show a message
+            return redirect(url_for('index'))  # or show flash message
+
         all_meals = []
         sufficiency_map = {}
 
