@@ -11,6 +11,16 @@ from db_utils import init_nutrition_db, init_beverage_db, insert_daily_meals
 from db_utils import get_latest_duration_from_gas_budget, get_cumulative_meal_mass
 from db_utils import get_latest_gas_budget_record
 from db_utils import load_sufficiency_map, get_latest_gas_mass, get_cumulative_meal_mass
+import openai
+from flask import jsonify
+from dotenv import load_dotenv
+import os
+from openai import OpenAI
+from agent_core import run_agent
+
+load_dotenv()
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
 # Call this early in app.py (e.g., after defining your app object)
 
 DB_PATH = 'astronauts.db'
@@ -27,6 +37,23 @@ from flask import Flask, redirect, url_for
 import sqlite3
 
 app = Flask(__name__)
+
+@app.route('/chat', methods=['GET'])
+def chat_page():
+    return render_template('chat.html')
+
+@app.route('/chat_api', methods=['POST'])
+def chat_api():
+    user_msg = request.json.get('message', '').strip()
+    if not user_msg:
+        return jsonify({'reply': "⚠️ No message received."}), 400
+
+    try:
+        reply = run_agent(user_msg)
+        return jsonify({'reply': reply})
+    except Exception as e:
+        return jsonify({'reply': f"💥 Error: {str(e)}"}), 500
+
 
 @app.route('/clear_all_databases', methods=['POST'])
 def clear_all_databases():
@@ -621,7 +648,6 @@ def ration_meal_database():
     insert_daily_meals(MEAL_DB, final_meals, sufficiency_map)
     referer = request.referrer or url_for('index')
     return redirect(referer)
-
 
 @app.route('/meal_log')
 def meal_log():

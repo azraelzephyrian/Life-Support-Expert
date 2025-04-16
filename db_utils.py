@@ -217,6 +217,15 @@ def get_last_meal_day(db_path, crew_name):
     conn.close()
     return result if result is not None else 0
 
+def reset_db(path, commands):
+    import sqlite3
+    conn = sqlite3.connect(path)
+    cursor = conn.cursor()
+    for cmd in commands:
+        cursor.execute(cmd)
+    conn.commit()
+    conn.close()
+
 
 def insert_daily_meals(db_path, meals: list, sufficiency_map: dict):
     """

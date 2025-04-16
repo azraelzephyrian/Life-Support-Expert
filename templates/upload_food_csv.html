@@ -147,15 +147,65 @@
             z-index: -1; /* Must be higher than #floating-astro (z-index: 0) */
             pointer-events: none; /* Let clicks pass through */
         }
+        #hal-chat-container {
+            display: none;
+            position: fixed;
+            bottom: 80px;
+            right: 40px;
+            width: 400px;
+            max-height: 80vh;
+            overflow: hidden;
+            z-index: 1000;
+            background: linear-gradient(rgba(0,0,0,0.85), rgba(0,0,0,0.85));
+            border-radius: 12px;
+            box-shadow: 0 0 15px rgba(255,255,255,0.3);
+            backdrop-filter: blur(4px);
+            overflow-y: auto;
+        }
+
+        .chat-box {
+            padding: 16px;
+            font-family: 'Inter', sans-serif;
+            position: relative;
+            z-index: 1001;
+        }
+
+        .messages {
+            max-height: 60vh;
+            overflow-y: auto;
+            background: none;
+            padding: 12px;
+            font-size: 16px;
+        }
+
+        .messages div {
+            animation: fadeIn 0.4s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
     </style>
 </head>
 <body>
     <img id="cupola-frame" src="{{ url_for('static', filename='images/cupola-audio-terminal-unit.png') }}" alt="Cupola Frame Overlay">
     <img id="floating-astro" src="{{ url_for('static', filename='images/Bruce_McCandless_II_during_EVA_in_1984.png') }}" alt="Astronaut Floating">
-    <h1>Upload Food CSV</h1>
-        
+
+    <!-- Navigation -->
     <div style="position: fixed; top: 20px; right: 40px; z-index: 20;">
-        <select onchange="if (this.value) window.location.href=this.value;" style="padding: 8px; border-radius: 6px; background-color: #111; color: #fff; font-family: 'Orbitron', sans-serif; box-shadow: 0 0 6px rgba(255,255,255,0.2);">
+        <select 
+            onchange="if (this.value) window.location.href=this.value;" 
+            style="
+                padding: 8px; 
+                border-radius: 6px; 
+                background-color: #111; 
+                color: #fff; 
+                font-family: 'Orbitron', sans-serif; 
+                box-shadow: 0 0 6px rgba(255,255,255,0.2);
+            "
+        >
             <option value="">🌐 Navigate to...</option>
             <option value="/">🏠 Home</option>
             <option value="/meal_log">📅 Meal Log</option>
@@ -163,26 +213,209 @@
             <option value="/upload_food_csv">📤 Upload Food CSV</option>
             <option value="/beverage_upload">📤 Upload Beverage CSV</option>
             <option value="/clear_all_databases">💾 Reset All Databases</option>
+            <option value="/chat">🤖 Chat with AI Assistant</option>
         </select>
     </div>
-    
-    <form method="POST" enctype="multipart/form-data">
-        <label>Select a .csv file with food data:</label><br>
-        <input type="file" name="csvfile" accept=".csv" required><br>
-        <button type="submit">Upload and Populate Database</button>
+
+    <!-- HAL Toggle -->
+    <div style="position: fixed; top: 20px; left: 40px; z-index: 20;">
+        <button 
+            onclick="toggleHALChat()" 
+            style="
+                padding: 8px 16px; 
+                border-radius: 6px; 
+                background-color: #111; 
+                color: #fff; 
+                font-family: 'Orbitron', sans-serif; 
+                box-shadow: 0 0 6px rgba(255,255,255,0.2); 
+                border: none;
+                cursor: pointer;
+            "
+        >
+            🔴 Chat With HAL
+        </button>
+    </div>
+
+    <!-- Chat Container -->
+    <div id="hal-chat-container">
+        <div class="chat-box">
+            <div class="messages" id="messages"></div>
+
+            <input id="userInput" placeholder="Ask HAL..." onkeydown="handleKey(event)" />
+            <button onclick="sendMessage()">Send</button>
+
+            <div style="margin-top: 12px; display: flex; justify-content: center; gap: 30px; align-items: center;">
+                <label style="color: white; font-size: 14px; display: flex; align-items: center; gap: 8px;">
+                    <input type="checkbox" id="voiceToggle" unchecked />
+                    🔊 Narrate AI Replies
+                </label>
+
+                <button onclick="startVoiceInput()">🎙️ Speak</button>
+            </div>
+        </div>
+
+        <div style="text-align: center; margin-top: 10px;">
+            <button onclick="clearChat()" style="background-color: crimson;">🧼 Clear Chat</button>
+        </div>
+    </div>
+
+    <!-- Title & Info Block -->
+    <div style="
+        background-color: rgba(0, 0, 0, 0.65); 
+        padding: 20px; 
+        border-radius: 12px; 
+        max-width: 800px; 
+        margin: 60px auto 20px auto; 
+        text-align: center;
+        box-shadow: 0 0 10px rgba(255,255,255,0.1);
+    ">
+        <h1 style="margin: 0;">🍲 Upload Food CSV</h1>
+
+        <p style="margin-top: 16px;">
+            <strong>Required columns:</strong> name, calories_per_gram<br>
+            <strong>Optional:</strong> fat_per_gram, sugar_per_gram, protein_per_gram
+        </p>
+    </div>
+
+    <!-- Upload Form -->
+    <form class="upload-form" action="/upload_food_csv" method="POST" enctype="multipart/form-data">
+        <label for="csvfile">Select CSV File:</label>
+        <input type="file" name="csvfile" accept=".csv" required>
+        <button type="submit">Upload Foods</button>
     </form>
 
-    <form action="/setup_foods" method="GET">
-        <button style="margin-top: 20px;">← Back to Food Setup</button>
-    </form>
+    <!-- Nav Buttons -->
+    <div class="button-row">
+        <form action="/" method="GET">
+            <button>Go Back Home</button>
+        </form>
+        <form action="/setup_foods" method="GET">
+            <button>← Food Setup</button>
+        </form>
+        <form action="/meal_log" method="GET">
+            <button>📅 View Meal Log</button>
+        </form>
+    </div>
 </body>
-<form action="/" method="GET">
-    <button type="start">Go Back Home</button>
-</form>
-<form action="/setup_foods" method="GET">
-    <button>← Food Setup</button>
-</form>
-<form action="/meal_log" method="GET">
-    <button>📅 View Meal Log from Database</button>
-</form>
+
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+        const savedHistory = localStorage.getItem("hal_chat_history");
+        if (savedHistory) {
+            document.getElementById("messages").innerHTML = savedHistory;
+        }
+    
+        const lastInput = localStorage.getItem("hal_last_input");
+        if (lastInput) {
+            document.getElementById("userInput").value = lastInput;
+        }
+    
+        document.getElementById("userInput").addEventListener("input", () => {
+            localStorage.setItem("hal_last_input", document.getElementById("userInput").value);
+        });
+    });
+    
+    function toggleHALChat() {
+        const chatBox = document.getElementById("hal-chat-container");
+        chatBox.style.display = chatBox.style.display === "none" ? "block" : "none";
+    }
+    
+    function clearChat() {
+        localStorage.removeItem("hal_chat_history");
+        localStorage.removeItem("hal_last_input");
+        document.getElementById("messages").innerHTML = "";
+        document.getElementById("userInput").value = "";
+    }
+    
+    function speakText(text) {
+        if (!document.getElementById("voiceToggle").checked) return;
+    
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = "en-US";
+        utterance.pitch = 0.8;
+        utterance.rate = 0.85;
+        utterance.volume = 0.9;
+    
+        const voices = window.speechSynthesis.getVoices();
+        const halVoice = voices.find(v =>
+            v.name.includes("Daniel") ||
+            v.name.includes("Matthew") ||
+            v.name.includes("Google US English") ||
+            v.name.includes("English")
+        );
+        if (halVoice) utterance.voice = halVoice;
+    
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utterance);
+    }
+    
+    function handleKey(event) {
+        if (event.key === "Enter") {
+            event.preventDefault();
+            sendMessage();
+        }
+    }
+    
+    async function sendMessage() {
+        const input = document.getElementById("userInput");
+        const text = input.value.trim();
+        if (!text) return;
+    
+        const msgBox = document.getElementById("messages");
+        msgBox.innerHTML += `<div class="user">👩‍🚀 ${text}</div>`;
+        input.value = "";
+    
+        const previewId = `preview-${Date.now()}`;
+        let previewHTML = `<div class="bot" id="${previewId}">🔴 <em>executing...</em></div>`;
+        msgBox.innerHTML += previewHTML;
+    
+        try {
+            const response = await fetch("/chat_api", {
+                method: "POST",
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: text })
+            });
+    
+            const data = await response.json();
+            const botReply = data.reply || "⚠️ No reply";
+            const container = document.getElementById(previewId);
+    
+            const jsonMatch = botReply.match(/__table__([\s\S]+?)__end__/);
+            const codeResult = botReply.replace(/```(?:python)?[\s\S]+?```/, '').trim();
+    
+            let finalRender = `<div class="bot">🔴 ${codeResult}</div>`;
+            if (jsonMatch) {
+                try {
+                    const json = JSON.parse(jsonMatch[1].trim());
+                    finalRender += renderTableFromJSON(json);
+                } catch (e) {
+                    finalRender += `<div style="color: red;">⚠️ Failed to parse table JSON.</div>`;
+                }
+            }
+    
+            container.outerHTML = finalRender;
+            speakText(botReply);
+        } catch (err) {
+            const container = document.getElementById(previewId);
+            container.outerHTML = `<div class="bot">💥 Error: ${err.message}</div>`;
+        }
+    
+        msgBox.scrollTop = msgBox.scrollHeight;
+        localStorage.setItem("hal_chat_history", msgBox.innerHTML);
+        localStorage.setItem("hal_last_input", "");
+    }
+    
+    function renderTableFromJSON(obj) {
+        if (!Array.isArray(obj) || obj.length === 0) return `<div>No data found.</div>`;
+        const keys = Object.keys(obj[0]);
+        const rows = obj.map(row => `<tr>${keys.map(k => `<td>${row[k]}</td>`).join('')}</tr>`).join('');
+    
+        return `
+            <table style="border-collapse: collapse; margin-top: 10px; background-color: #1b1b1b; color: #fff; border: 1px solid #666;">
+                <thead><tr>${keys.map(k => `<th style="padding: 4px 8px; border: 1px solid #666;">${k}</th>`).join('')}</tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+        `;
+    }
+    </script>
 </html>
