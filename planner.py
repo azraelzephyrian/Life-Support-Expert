@@ -4,6 +4,9 @@ collections.Mapping = collections.abc.Mapping
 from experta import *
 import random
 
+class PlannerConfig(Fact):
+    """Holds planning constants like per_meal_kcal."""
+    pass
 
 
 class MealSlot(Fact):
@@ -54,10 +57,18 @@ class MealPlanner(KnowledgeEngine):
 
         # Track list of last 6 food and bev choices (updated on finalize)
         self.last_6_items = []
+        self.original_target = calorie_target
+        self.gram_targets_by_food = {}
 
         # Track last assigned food/bev
         self.last_food = None
         self.last_bev = None
+        # inside setup()
+
+        self.daily_target = calorie_target              # e.g., 2400 kcal/day
+        self.original_target = calorie_target * duration  # e.g., 2400 × 7 = 16,800 kcal
+
+
 
 
 
@@ -87,26 +98,37 @@ class MealPlanner(KnowledgeEngine):
 
     def setup(self):
         self.reset()
-        # Declare all slots for the mission
+
+        # 🔁 Force re-calculate per-meal target (defensive)
+        self.per_meal_kcal = (self.calorie_target * self.ration_fraction) / self.meals_per_day
+
+        # Declare all slots
         for i in range(self.duration):
             day = self.start_day + i
             for meal in range(1, self.meals_per_day + 1):
                 self.declare(MealSlot(day=day, meal=meal, crew_name=self.name))
 
-        # Declare all food and beverage options
         for food in self.foods:
-            self.declare(FoodOption(food_name=food['food_name'],
-                                    calories_per_gram=food['calories_per_gram'],
-                                    rating=food['rating']))
+            cpg = food['calories_per_gram']
+            grams = round(self.per_meal_kcal / cpg, 2) if cpg > 0 else 0
+            self.declare(FoodOption(
+                food_name=food['food_name'],
+                calories_per_gram=cpg,
+                rating=food['rating'],
+                target_grams=grams
+            ))
 
         for bev in self.beverages:
-            self.declare(BeverageOption(beverage_name=bev['beverage_name'],
-                                        calories_per_gram=bev['calories_per_gram'],
-                                        rating=bev['rating']))
+            self.declare(BeverageOption(
+                beverage_name=bev['beverage_name'],
+                calories_per_gram=bev['calories_per_gram'],
+                rating=bev['rating']
+            ))
 
         self.meal_history_fact = self.declare(MealHistory(crew_name=self.name, last_food=None, last_bev=None))
-        print(f"[{self.name}] Foods available: {len(self.foods)}")
-        print(f"[{self.name}] Beverages available: {len(self.beverages)}")
+
+
+
 
 
     def slot_already_assigned(self, fact_type, day, meal):
@@ -154,33 +176,34 @@ class MealPlanner(KnowledgeEngine):
     @Rule(
         MealSlot(day=MATCH.day, meal=MATCH.meal, crew_name=MATCH.name),
         AS.history << MealHistory(crew_name=MATCH.name, last_food=MATCH.last_food, last_bev=MATCH.last_bev),
-        AS.food << FoodOption(food_name=MATCH.fname, calories_per_gram=MATCH.cpg, rating=MATCH.rating),
+        AS.food << FoodOption(
+            food_name=MATCH.fname,
+            calories_per_gram=MATCH.cpg,
+            rating=MATCH.rating,
+            target_grams=MATCH.grams
+        ),
         TEST(lambda fname, last_food: last_food is None or fname != last_food),
         salience=2
     )
-    def assign_food(self, food, fname, cpg, rating, day, meal, name, last_food, last_bev):
+    def assign_food(self, food, fname, cpg, rating, grams, day, meal, name, last_food, last_bev):
         if self.slot_already_assigned(SelectedFood, day, meal):
             return
 
-        # Filter with Python logic
-        candidates = [
-            f for f in self.foods
-            if f['rating'] > 1 and self.is_food_allowed(f['food_name'], day, meal)
-        ]
+        if not self.is_food_allowed(fname, day, meal):
+            return
 
-        if not candidates:
-            return  # Nothing legal to choose
-
-        chosen = self.weighted_choice(candidates, 'rating')
-        grams = round(self.per_meal_kcal / chosen['calories_per_gram'], 2)
-
-        self.last_food = chosen['food_name']
+        self.last_food = fname
         self.declare(SelectedFood(
-            food=chosen['food_name'],
+            food=fname,
             food_grams=grams,
             day=day,
             meal=meal
         ))
+
+
+
+
+
 
 
 
@@ -257,48 +280,52 @@ class MealPlanner(KnowledgeEngine):
         """
         fraction = 1.0
         expected_meals = self.duration * self.meals_per_day
+        self.daily_target = self.original_target / self.duration  # Fixed baseline per day
 
         while fraction >= min_fraction:
             self.ration_fraction = fraction
-            self.per_meal_kcal = (self.calorie_target * self.ration_fraction) / self.meals_per_day
+            self.calorie_target = self.daily_target * self.ration_fraction
+            self.per_meal_kcal = self.calorie_target / self.meals_per_day
             self.schedule.clear()
+
             result = self.run_planner()
 
-            # ✅ Exit early if a full schedule was successfully generated
-            if len(result['schedule']) >= expected_meals:
-                result['ration_fraction'] = round(fraction, 3)
-                return result
-
-            # ✅ Also exit if total mass is already acceptable
-            if result['total_mass'] <= mass_budget:
+            # Exit if we hit all meals or already meet mass constraint
+            if len(result['schedule']) >= expected_meals and result['total_mass'] <= mass_budget:
                 result['ration_fraction'] = round(fraction, 3)
                 return result
 
             fraction -= step
 
-        # If all failed, return last attempted plan with a warning
+        # Return last attempted result if all failed
         result['ration_fraction'] = round(fraction + step, 3)
         result['warning'] = f"Unable to meet mass budget of {mass_budget} kg above {min_fraction*100}% rationing."
         return result
 
 
+
     def run_planner(self):
         self.setup()
-    
-        self.run()  
-
-
-
+        self.run()
 
         total_food_mass = round(sum(x['food_grams'] for x in self.schedule), 2)
         total_bev_mass = round(sum(x['beverage_grams'] for x in self.schedule), 2)
-        total_intake_kcal = round(self.calorie_target * self.ration_fraction, 2)
-        intake_ratio = total_intake_kcal / self.calorie_target
 
-        # For future: adjust target downward and recalculate actual kcal intake to simulate rationing
+        # 🔁 Actual intake calculation
+        total_intake_kcal = 0.0
+        for meal in self.schedule:
+            food_name = meal['food']
+            food_grams = meal['food_grams']
+            bev_name = meal['beverage']
+            bev_grams = meal['beverage_grams']
 
-        sufficiency = 'sufficient'
-        intake_ratio = total_intake_kcal / self.calorie_target
+            food_cpg = next((f['calories_per_gram'] for f in self.foods if f['food_name'] == food_name), 0)
+            bev_cpg = next((b['calories_per_gram'] for b in self.beverages if b['beverage_name'] == bev_name), 0)
+
+            total_intake_kcal += food_grams * food_cpg + bev_grams * bev_cpg
+
+        # ✅ Use original calorie target to define sufficiency
+        intake_ratio = total_intake_kcal / self.original_target if self.original_target > 0 else 0
 
         if intake_ratio < 0.85:
             sufficiency = 'insufficient'
@@ -314,7 +341,8 @@ class MealPlanner(KnowledgeEngine):
             'total_beverage_mass': total_bev_mass,
             'total_mass': round(total_food_mass + total_bev_mass, 2),
             'calorie_target': self.calorie_target,
-            'rationed_kcal': total_intake_kcal,
+            'rationed_kcal': round(total_intake_kcal, 2),
             'intake_ratio': round(intake_ratio, 3),
             'sufficiency_status': sufficiency
         }
+

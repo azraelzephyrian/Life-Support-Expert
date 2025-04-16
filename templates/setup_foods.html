@@ -3,24 +3,162 @@
 <head>
     <meta charset="UTF-8">
     <title>Setup Foods & Beverages</title>
+
+    <!-- Fonts and base CSS -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+
     <style>
-        body { font-family: Arial; max-width: 1300px; margin: 30px auto; background: #f8f8f8; padding: 20px; }
-        .panel-container { display: flex; gap: 40px; justify-content: space-between; flex-wrap: wrap; }
-        .panel { background: #fff; padding: 15px; border-radius: 6px; flex: 1; min-width: 500px; }
+        body {
+            background: url('/static/images/cupola-audio-terminal-unit.jpg') no-repeat center center fixed;
+            background-size: cover;
+            padding: 40px;
+            margin: 0;
+        }
 
-        h2 { margin-top: 0; }
-        label { display: block; margin-top: 10px; }
-        input, select { width: 100%; padding: 8px; margin-top: 5px; }
-        button { margin-top: 15px; padding: 10px 12px; }
+        h1, h2 {
+            font-family: 'Orbitron', sans-serif;
+            color: #fff;
+            text-align: center;
+            text-shadow: 0 0 6px rgba(0, 0, 0, 0.8);
+        }
 
-        table { width: 100%; margin-top: 20px; border-collapse: collapse; background: #fff; }
-        th, td { border: 1px solid #ccc; padding: 8px; text-align: center; }
-        th { background: #eee; }
+        .panel-container {
+            display: flex;
+            gap: 40px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 30px;
+        }
 
-        .section { margin-top: 40px; }
+        .panel {
+            background: rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(8px);
+            padding: 20px;
+            border-radius: 10px;
+            width: 580px;
+            color: #f0f0f0;
+            font-family: 'Inter', sans-serif;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+        }
+
+        label {
+            display: block;
+            margin-top: 10px;
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+            background: #0d0d0d;
+            color: #fff;
+            border: 1px solid #444;
+            border-radius: 6px;
+            font-family: 'Inter', sans-serif;
+        }
+
+        table {
+            width: 100%;
+            margin-top: 20px;
+            border-collapse: collapse;
+            background-color: rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(8px);
+            border-radius: 8px;
+            overflow: hidden;
+            color: #f0f0f0;
+            font-family: 'Inter', sans-serif;
+        }
+
+        th, td {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 10px;
+            text-align: center;
+        }
+
+        th {
+            background: rgba(255, 255, 255, 0.1);
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .section {
+            margin-top: 60px;
+            background-color: rgba(0, 0, 0, 0.6);
+            padding: 20px;
+            border-radius: 10px;
+            font-family: 'Inter', sans-serif;
+            box-shadow: 0 0 10px rgba(255,255,255,0.08);
+        }
+
+        button {
+            background-image: url('/static/images/beautiful-space-background-vector.jpg');
+            background-size: cover;
+            background-position: center;
+            color: white;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 15px;
+            font-weight: bold;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            margin-top: 20px;
+            margin-right: 10px;
+            cursor: pointer;
+            box-shadow: 0 0 12px rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 18px rgba(255, 255, 255, 0.4);
+        }
+
+        .button-row {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 40px;
+        }
+        #floating-astro {
+            position: fixed;
+            top: 30%;
+            left: 2%;
+            width: 180px;
+            opacity: 1.0;
+            transform: translate(-50%, -50%);
+            z-index: 0;  /* 👈 behind all content */
+            animation: drift-astro 60s linear infinite alternate;
+            pointer-events: none;
+            filter: drop-shadow(0 0 6px rgba(255,255,255,0.5));
+        }
+
+
+        /* Floating motion */
+        @keyframes drift-astro {
+            0% {
+                transform: translate(0, 0) rotate(-10deg) scale(1.0);
+            }
+            30% {
+                transform: translate(-120px, 40px) rotate(8deg) scale(1.00);
+            }
+            60% {
+                transform: translate(100px, -80px) rotate(12deg) scale(1.00);
+            }
+            90% {
+                transform: translate(70px, 70px) rotate(-18deg) scale(1.00);
+            }
+            100% {
+                transform: translate(-50px, -30px) rotate(-2deg) scale(1.00);
+            }
+
+        }
     </style>
 </head>
+
 <body>
+    <img id="floating-astro" src="{{ url_for('static', filename='images/Bruce_McCandless_II_during_EVA_in_1984.png') }}" alt="Astronaut Floating">
 
     <h1>Food & Beverage Database Editor</h1>
 
@@ -179,13 +317,10 @@
     </div>
 
     <form action="/" method="GET" style="margin-top: 30px;">
-        <button>← Back to Life Support</button>
+        <button>← Go Back Home</button>
     </form>
 
 </body>
-<form action="/" method="GET">
-    <button type="start">Edit Food Database →</button>
-</form>
 <form action="/upload_food_csv" method="GET">
     <button>Upload Food CSV →</button>
 </form>

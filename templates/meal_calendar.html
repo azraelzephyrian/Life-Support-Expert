@@ -1,58 +1,239 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>Meal Calendar</title>
+
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+
     <style>
-        body { font-family: Arial; max-width: 1200px; margin: 30px auto; background: #f9f9f9; padding: 20px; }
-        h2 { margin-top: 40px; }
-        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; background: white; }
-        th, td { padding: 8px; border: 1px solid #ccc; text-align: center; }
-        th { background: #ddd; }
-        .meal-box { padding: 5px; }
-        .meal-box small { display: block; font-size: 0.85em; color: #555; }
+        /* Additional page-specific styles */
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            text-align: center;
+            color: #fff;
+            text-shadow: 0 0 6px rgba(0,0,0,0.8);
+        }
+
+        h2 {
+            font-family: 'Orbitron', sans-serif;
+            color: #fff;
+            margin-top: 40px;
+            text-align: center;
+            text-shadow: 0 0 6px rgba(0,0,0,0.7);
+        }
+
+        .calendar-table {
+            width: 100%;
+            margin: 20px auto 40px auto;
+            border-collapse: collapse;
+            background-color: rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(8px);
+            border-radius: 10px;
+            overflow: hidden;
+            color: #f0f0f0;
+            font-family: 'Inter', sans-serif;
+        }
+
+        .calendar-table th,
+        .calendar-table td {
+            padding: 10px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+            text-align: center;
+        }
+
+        .calendar-table th {
+            background-color: rgba(255, 255, 255, 0.1);
+            font-family: 'Orbitron', sans-serif;
+        }
+
+        .meal-box small {
+            display: block;
+            font-size: 0.85em;
+            color: #ccc;
+        }
+
+        .form-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            flex-wrap: wrap;
+            margin-top: 40px;
+        }
+
+        button {
+            background-image: url('/static/images/beautiful-space-background-vector.jpg');
+            background-size: cover;
+            background-position: center;
+            color: white;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 16px;
+            font-weight: bold;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            box-shadow: 0 0 12px rgba(255, 255, 255, 0.3);
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 18px rgba(255, 255, 255, 0.5);
+        }
+
+        body {
+            background: url('/static/images/cupola-audio-terminal-unit.jpg') no-repeat center center fixed;
+            background-size: cover;
+            margin: 0;
+            padding: 40px;
+        }
+        .sufficiency-table {
+            width: 60%;
+            margin: 20px auto;
+            border-collapse: collapse;
+            background-color: rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(8px);
+            border-radius: 10px;
+            overflow: hidden;
+            color: #f0f0f0;
+            font-family: 'Inter', sans-serif;
+            box-shadow: 0 0 12px rgba(0, 0, 0, 0.4);
+        }
+
+        .sufficiency-table th,
+        .sufficiency-table td {
+            padding: 12px;
+            text-align: center;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .sufficiency-table th {
+            background-color: rgba(255, 255, 255, 0.1);
+            font-family: 'Orbitron', sans-serif;
+            font-weight: bold;
+            text-shadow: 0 0 6px rgba(0, 0, 0, 0.6);
+        }
+        .sufficient {
+            color: #2ecc71;  /* bright green */
+            font-weight: bold;
+        }
+
+        .moderate {
+            color: #f39c12;  /* orange */
+            font-weight: bold;
+        }
+
+        .insufficient {
+            color: #e74c3c;  /* red */
+            font-weight: bold;
+        }
+
+        .space-button {
+            padding: 10px 20px;
+            font-size: 16px;
+            background-color: #3366cc;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+
+        .space-button:hover {
+            background-color: #254b9a;
+        }
+
     </style>
 </head>
 <body>
-    <h1>Meal Calendar with Preferences (from Database)</h1>
+    <img id="floating-astro" src="{{ url_for('static', filename='images/Bruce_McCandless_II_during_EVA_in_1984.png') }}" alt="Astronaut Floating">
+    <form action="/regenerate_meals" method="POST" onsubmit="return confirm('Are you sure you want to regenerate all meals? This will overwrite the current meal schedule.')">
+        <button type="submit">🔁 Regenerate Meals</button>
+    </form>  
+    <div class="form-buttons" style="display: flex; justify-content: center; gap: 20px; margin-top: 20px;">
+        <form action="/" method="GET">
+            <button type="submit" class="space-button">← Go Back Home</button>
+        </form>
+        
+    
+        <form action="/setup_foods" method="GET">
+            <button type="submit" class="space-button">Edit Food Database →</button>
+        </form>
+    </div>    
+    <h2>Crew Nutrition Sufficiency</h2>
+    <table class ="sufficiency-table">
+    <thead>
+        <tr>
+        <th>Crew Member</th>
+        <th>Sufficiency Status</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for name, record in sufficiency_map.items() %}
+            <tr>
+                <td rowspan="2">{{ name }}</td>
+                <td class="{{ record.status | lower }}">Status: {{ record.status }}</td>
+            </tr>
+            <tr>
+                <td class="{{ record.status | lower }}">Intake Ratio: {{ record.intake_ratio | round(3) }}</td>
+            </tr>
+        {% endfor %}
+    </tbody>    
+    </table>
+    <h1>🍽️ Meal Calendar with Preferences</h1>
 
     {% for entry in calendar_data %}
         <h2>{{ entry.crew }}</h2>
-        <table>
-            <tr>
-                <th>Day</th>
-                <th>Meal</th>
-                <th>Food</th>
-                <th>Food Mass (g)</th>
-                <th>Preference</th>
-                <th>Beverage</th>
-                <th>Beverage (g)</th>
-                <th>Beverage Preference</th>
-            </tr>
-            {% for meal in entry.schedule %}
+        <table class="calendar-table">
+            <thead>
                 <tr>
-                    <td>{{ meal.day }}</td>
-                    <td>
-                        {% if meal.meal == 1 %}Breakfast
-                        {% elif meal.meal == 2 %}Lunch
-                        {% else %}Dinner{% endif %}
-                    </td>
-                    <td>{{ meal.food_name }}</td>
-                    <td>{{ meal.food_grams }}</td>
-                    <td>{{ meal.food_rating }}</td>
-                    <td>{{ meal.beverage_name }}</td>
-                    <td>{{ meal.beverage_grams }}</td>
-                    <td>{{ meal.beverage_rating }}</td>
+                    <th>Day</th>
+                    <th>Meal</th>
+                    <th>Food</th>
+                    <th>Food Mass (g)</th>
+                    <th>Preference</th>
+                    <th>Beverage</th>
+                    <th>Beverage (g)</th>
+                    <th>Beverage Preference</th>
                 </tr>
-            {% endfor %}
+            </thead>
+            <tbody>
+                {% for meal in entry.schedule %}
+                    <tr>
+                        <td>{{ meal.day }}</td>
+                        <td>
+                            {% if meal.meal == 1 %}Breakfast
+                            {% elif meal.meal == 2 %}Lunch
+                            {% else %}Dinner{% endif %}
+                        </td>
+                        <td>{{ meal.food_name }}</td>
+                        <td>{{ meal.food_grams }}</td>
+                        <td>{{ meal.food_rating }}</td>
+                        <td>{{ meal.beverage_name }}</td>
+                        <td>{{ meal.beverage_grams }}</td>
+                        <td>{{ meal.beverage_rating }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
         </table>
     {% endfor %}
 
-    <form action="/" method="GET">
-        <button>← Back to Life Support</button>
-    </form>
-    <form action="/setup_foods" method="GET">
-        <button>Edit Food Database →</button>
-    </form>
+    <div class="form-buttons">
+        <form action="/" method="GET">
+            <button type="submit">← Go Back Home</button>
+        </form>
+        <form action="/setup_foods" method="GET">
+            <button type="submit">Edit Food Database →</button>
+        </form>
+    </div>
+
 </body>
+<form action="/setup_foods" method="GET">
+    <button>← Food Setup</button>
+</form>
 </html>

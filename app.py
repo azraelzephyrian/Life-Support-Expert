@@ -2,15 +2,15 @@
 from flask import Flask, render_template, request, redirect, url_for
 from engine import LifeSupportEngine, LifeSupportFacts
 from db_utils import init_db, insert_or_update, fetch_all_records
-from planner import MealPlanner
+from planner_fuck import MealPlanner
 from db_utils import get_latest_remaining_mass_budget
 from db_utils import fetch_all_records, get_all_nutrition_data  # assume these already exist
 import sqlite3
 import pandas as pd 
 from db_utils import init_nutrition_db, init_beverage_db, insert_daily_meals
 from db_utils import get_latest_duration_from_gas_budget, get_cumulative_meal_mass
-
-
+from db_utils import get_latest_gas_budget_record
+from db_utils import load_sufficiency_map, get_latest_gas_mass, get_cumulative_meal_mass
 # Call this early in app.py (e.g., after defining your app object)
 
 DB_PATH = 'astronauts.db'
@@ -26,29 +26,169 @@ init_beverage_db('beverage.db')
 
 @app.route('/', methods=['GET', 'POST'])
 def index():
-    results = None
+    load_sufficiency_map = None
+    results = {}
     crew_records = fetch_all_records(DB_PATH, TABLE_NAME)
+    record = get_latest_gas_budget_record()
 
+    # Status interpretation
+    if record:
+        status = "✅ Within mass limit!" if record['within_limit'] else "❌ Exceeds mass limit!"
+        status_color = "green" if record['within_limit'] else "red"
+    else:
+        status = "⚠️ No record found"
+        status_color = "gray"
+        # Full results fallback if DB is empty
+        results.update({
+            'live_gas_mass': 0,
+            'live_meal_mass': 0,
+            'live_combined_mass': 0,
+            'live_weight_limit': 0,
+            'base_weight_limit': None,
+            'adjusted_weight_limit': None,
+            'live_over_limit': None,
+            'duration': None,
+            'crew_count': None,
+            'activity': None,
+            'total_life_support_mass': 0,
+            'cumulative_meal_mass': 0,
+            'combined_life_support_mass': 0,
+            'o2_required': None,
+            'o2_reclaimed': None,
+            'co2_generated': None,
+            'o2_tank_mass': None,
+            'scrubber_mass': None,
+            'recycler_mass': None,
+            'use_scrubber': None,
+            'use_recycler': None,
+            'n2_required': None,
+            'n2_tank_mass': None,
+            'water_hygiene_raw': None,
+            'water_excretion': None,
+            'water_recovered': None,
+            'water_net': None,
+            'water_recycler_mass': None,
+            'use_water_recycler': None,
+            'timestamp': None
+        })
+
+    try:
+        gas_mass, weight_limit, _ = get_latest_gas_mass()
+        meal_mass = get_cumulative_meal_mass()
+        
+        combined_mass = round(gas_mass + meal_mass, 2)
+
+        results.update({
+            'live_gas_mass': gas_mass,
+            'live_meal_mass': meal_mass,
+            'live_combined_mass': combined_mass,
+            'live_weight_limit': weight_limit,
+            'live_over_limit': (
+                combined_mass is not None and
+                weight_limit is not None and
+                combined_mass < weight_limit
+            )
+        })
+
+        if record:
+            # Safe defaults with fallback if DB values are missing or NULL
+            total_gas_mass = record.get('total_life_support_mass')
+            if total_gas_mass is None:
+                total_gas_mass = gas_mass
+
+            cumulative_meal_mass = meal_mass
+            combined_life_support_mass = round(total_gas_mass + cumulative_meal_mass, 2)
+
+
+            base_limit = record.get('base_weight_limit')
+            if base_limit is None:
+                base_limit = weight_limit
+
+            # Update all result fields
+            results.update({
+                'duration': record.get('duration'),
+                'crew_count': record.get('crew_count'),
+                'activity': record.get('activity'),
+
+                # Core values
+                'total_life_support_mass': total_gas_mass,
+                'cumulative_meal_mass': cumulative_meal_mass,
+                'combined_life_support_mass': combined_life_support_mass,
+                'live_gas_mass': total_gas_mass,
+                'live_meal_mass': cumulative_meal_mass,
+                'live_combined_mass': combined_life_support_mass,
+
+                # Limits
+                'base_weight_limit': base_limit,
+                'live_weight_limit': base_limit,
+                'adjusted_weight_limit': record.get('weight_limit'),
+                'live_over_limit': (
+                    combined_life_support_mass is not None and
+                    base_limit is not None and
+                    combined_life_support_mass < base_limit
+                ),
+
+                # Oxygen
+                'o2_required': record.get('o2_required_kg'),
+                'o2_reclaimed': record.get('o2_reclaimed'),
+                'co2_generated': record.get('co2_generated'),
+                'o2_tank_mass': record.get('o2_tank_mass'),
+
+                # Scrubber + Recycler
+                'scrubber_mass': record.get('scrubber_mass'),
+                'recycler_mass': record.get('recycler_mass'),
+                'use_scrubber': record.get('use_scrubber'),
+                'use_recycler': record.get('use_recycler'),
+
+                # Nitrogen
+                'n2_required': record.get('n2_required_kg'),
+                'n2_tank_mass': record.get('n2_tank_mass'),
+
+                # Water
+                'water_hygiene_raw': record.get('water_hygiene_raw'),
+                'water_excretion': record.get('water_excretion'),
+                'water_recovered': record.get('water_recovered'),
+                'water_net': record.get('water_net'),
+                'water_recycler_mass': record.get('water_recycler_mass'),
+                'use_water_recycler': record.get('use_water_recycler'),
+
+                # Metadata
+                'timestamp': record.get('timestamp')
+            })
+
+    except Exception as e:
+        results = {'error': str(e)}
+
+
+    # POST handling
     if request.method == 'POST':
+        record = get_latest_gas_budget_record()
+        existing_base_limit = record.get('base_weight_limit') if record else None
+        # 🛠 If there's an existing base limit in the DB, preserve it
+        if record and record.get('base_weight_limit') is not None:
+            base_weight_limit = record.get('base_weight_limit')
+        else:
+            base_weight_limit = float(request.form['weight_limit'])
         try:
             duration = int(request.form['duration'])
             activity = request.form['activity']
-            weight_limit = float(request.form['weight_limit'])
+
+            # 🔁 Recalculate weight limit based on latest meal mass
+            meal_mass = get_cumulative_meal_mass()
+            weight_limit = round(base_weight_limit - meal_mass, 2)
+
             oxygen_tank_weight_per_kg = float(request.form['oxygen_tank_weight_per_kg'])
 
             use_scrubber = request.form.get('use_scrubber') == 'on'
             use_recycler = request.form.get('use_recycler') == 'on'
 
-            # Scrubber params
             co2_scrubber_efficiency = float(request.form.get('co2_scrubber_efficiency') or 0)
             scrubber_weight_per_kg = float(request.form.get('scrubber_weight_per_kg') or 0)
 
-            # Recycler params
             co2_recycler_efficiency = float(request.form.get('co2_recycler_efficiency') or 0)
             recycler_weight = float(request.form.get('recycler_weight') or 0)
             water_recycler_weight = float(request.form.get('water_recycler_weight') or 0)
 
-            # New nitrogen and water parameters
             nitrogen_tank_weight_per_kg = float(request.form.get('nitrogen_tank_weight_per_kg') or 0)
             hygiene_water_per_day = float(request.form.get('hygiene_water_per_day') or 0)
             use_water_recycler = request.form.get('use_water_recycler') == 'on'
@@ -83,40 +223,92 @@ def index():
             ))
 
             print("FACTS BEING DECLARED:")
-            print({
-                "duration": duration,
-                "crew_count": crew_count,
-                "body_masses": body_masses,
-                "activity": activity,
-                "oxygen_tank_weight_per_kg": oxygen_tank_weight_per_kg,
-                "weight_limit": weight_limit,
-                "use_scrubber": use_scrubber,
-                "use_recycler": use_recycler,
-                "co2_scrubber_efficiency": co2_scrubber_efficiency,
-                "scrubber_weight_per_kg": scrubber_weight_per_kg,
-                "co2_recycler_efficiency": co2_recycler_efficiency,
-                "recycler_weight": recycler_weight,
-                "nitrogen_tank_weight_per_kg": nitrogen_tank_weight_per_kg,
-                "hygiene_water_per_day": hygiene_water_per_day,
-                "use_water_recycler": use_water_recycler,
-                "water_recycler_efficiency": water_recycler_efficiency
-            })
+            print(engine.facts)
 
             engine.run()
-            results = engine.results
+            results.update(engine.results)
+
+            # Add DB insertion call with all fields (including o2/n2 required)
+            from db_utils import insert_gas_budget
+            from datetime import datetime
+
+            insert_gas_budget("gas_budget.db", {
+                'timestamp': datetime.now().isoformat(),
+                'duration': duration,
+                'crew_count': crew_count,
+                'body_masses': ','.join(map(str, body_masses)),
+                'activity': activity,
+                'oxygen_tank_weight_per_kg': oxygen_tank_weight_per_kg,
+                'co2_generated': results['co2_generated'],
+                'o2_required_kg': results['o2_required_kg'],  # ✅ HERE
+                'o2_reclaimed': results['o2_reclaimed'],
+                'o2_tank_mass': results['o2_tank_mass'],
+                'scrubber_mass': results['scrubber_mass'],
+                'recycler_mass': results['recycler_mass'],
+                'total_gas_mass': results['total_life_support_mass'],
+                'use_scrubber': use_scrubber,
+                'use_recycler': use_recycler,
+                'co2_scrubber_efficiency': co2_scrubber_efficiency,
+                'scrubber_weight_per_kg': scrubber_weight_per_kg,
+                'co2_recycler_efficiency': co2_recycler_efficiency,
+                'recycler_weight': recycler_weight,
+                'within_limit': results['live_over_limit'],
+                'weight_limit': weight_limit,
+
+                # New stuff
+                'nitrogen_tank_weight_per_kg': nitrogen_tank_weight_per_kg,
+                'n2_required_kg': results['n2_required_kg'],  # ✅ AND HERE
+                'n2_tank_mass': results['n2_tank_mass'],
+                'hygiene_water_per_day': hygiene_water_per_day,
+                'water_hygiene_raw': results['water_hygiene_raw'],
+                'water_excretion': results['water_excretion'],
+                'water_recovered': results['water_recovered'],
+                'water_net': results['water_net'],
+                'use_water_recycler': use_water_recycler,
+                'water_recycler_efficiency': water_recycler_efficiency,
+                'cumulative_meal_mass': results['cumulative_meal_mass'],
+                'combined_life_support_mass': results['combined_life_support_mass'],
+                'water_recycler_mass': results['water_recycler_mass'],
+                'total_life_support_mass': results['total_life_support_mass'],
+                'base_weight_limit': existing_base_limit or float(request.form.get('weight_limit') or 0)
+
+            })
+
+
+            gas_mass, _, _ = get_latest_gas_mass()
+            meal_mass = get_cumulative_meal_mass()
+            combined_mass = round(gas_mass + meal_mass, 2)
+
+            results['live_gas_mass'] = gas_mass
+            results['live_meal_mass'] = meal_mass
+            results['live_combined_mass'] = combined_mass
+            results['live_weight_limit'] = base_weight_limit
+            results['base_weight_limit'] = base_weight_limit
+            results['live_over_limit'] = (
+                combined_mass is not None and
+                base_weight_limit is not None and
+                combined_mass < base_weight_limit
+            )
 
             if 'error' not in results:
-                meal_mass = get_cumulative_meal_mass()
-                results['water_recycler_mass'] = round(water_recycler_weight, 2)
                 results['cumulative_meal_mass'] = meal_mass
+                results['adjusted_weight_limit'] = weight_limit
                 results['combined_life_support_mass'] = round(results['total_life_support_mass'] + meal_mass, 2)
-     
 
         except Exception as e:
             results = {'error': str(e)}
 
-    return render_template('index.html', results=results, crew=crew_records)
+    return render_template('index.html', results=results, crew=crew_records, status=status, status_color=status_color)
 
+@app.route('/clear_gas_database')
+def clear_database():
+    import sqlite3
+    conn = sqlite3.connect("gas_budget.db")
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM gas_masses")
+    conn.commit()
+    conn.close()
+    return redirect(url_for('index'))
 
 @app.route('/add_or_edit_crew', methods=['POST'])
 def add_or_edit_crew():
@@ -145,26 +337,153 @@ def get_last_meal_day(db_path, crew_name):
     conn.close()
     return result[0] if result and result[0] is not None else 0
 
+@app.route('/clear_meals', methods=['POST'])
+def clear_meals():
+    import sqlite3
+    conn = sqlite3.connect('meal_schedule.db')
+    cursor = conn.cursor()
+    cursor.execute("DROP TABLE IF EXISTS daily_meals;")
+    cursor.execute("DROP TABLE IF EXISTS crew_sufficiency;")
+    conn.commit()
+    conn.close()
+    print("🧼 Meal database cleared.")
+    return redirect(url_for('meal_log'))  # or another relevant page
+
+@app.route('/ration')
+def ration_meal_database():
+    import sqlite3
+    import pandas as pd
+    from db_utils import (
+        get_cumulative_meal_mass,
+        fetch_all_records,
+        get_all_nutrition_data,
+        insert_daily_meals,
+        get_latest_remaining_mass_budget
+    )
+
+    MEAL_DB = 'meal_schedule.db'
+    CREW_DB = 'astronauts.db'
+
+    # 🍱 Load meals and crew info
+    conn = sqlite3.connect(MEAL_DB)
+    df = pd.read_sql("SELECT * FROM daily_meals", conn)
+    conn.close()
+
+    crew_df = fetch_all_records(CREW_DB, 'crew')
+    crew_mass_map = dict(zip(crew_df['name'], crew_df['mass']))
+
+    # 🔍 Get nutrition info and lowercase the maps
+    food_df, beverage_df, _, _ = get_all_nutrition_data()
+    food_cpg_map = {
+        row['name'].strip().lower(): row['calories_per_gram']
+        for _, row in food_df.iterrows()
+    }
+    bev_cpg_map = {
+        row['name'].strip().lower(): row['calories_per_gram']
+        for _, row in beverage_df.iterrows()
+    }
+
+    # 🚀 Get total allowed mass per person
+    total_budget = get_latest_remaining_mass_budget()
+    crew_names = df['crew_name'].unique().tolist()
+    per_crew_budget = total_budget / len(crew_names)
+
+    final_meals = []
+    sufficiency_map = {}
+
+    for name in crew_names:
+        crew_meals = df[df['crew_name'] == name].copy()
+        total_food_mass = crew_meals['food_grams'].sum()
+        total_bev_mass = crew_meals['beverage_grams'].sum()
+        scaling_ratio = min(1.0, (per_crew_budget - total_bev_mass / 1000.0) / (total_food_mass / 1000.0))
+
+        print(f"\n🔍 {name} — Food Mass: {round(total_food_mass, 1)}g, Bev Mass: {round(total_bev_mass,1)}g, Budget: {round(per_crew_budget,2)}kg, Scaling Ratio: {round(scaling_ratio, 3)}")
+
+        scaled_kcal = 0.0
+        for _, row in crew_meals.iterrows():
+            food_name = row['food_name']
+            bev_name = row['beverage_name']
+            normalized_food = food_name.strip().lower()
+            normalized_bev = bev_name.strip().lower()
+
+            food_cpg = food_cpg_map.get(normalized_food, 0)
+            bev_cpg = bev_cpg_map.get(normalized_bev, 0)
+
+            scaled_food_grams = round(row['food_grams'] * scaling_ratio, 2)
+            food_kcal = scaled_food_grams * food_cpg
+            bev_kcal = row['beverage_grams'] * bev_cpg
+            scaled_kcal += food_kcal + bev_kcal
+
+            print(f"  🍽️ {food_name}: {scaled_food_grams}g × {food_cpg} kcal/g + {row['beverage_grams']}g × {bev_cpg} kcal/g = {round(food_kcal + bev_kcal, 2)} kcal")
+
+            final_meals.append({
+                'crew_name': name,
+                'day': row['day'],
+                'meal': row['meal'],
+                'food_name': food_name,
+                'food_grams': scaled_food_grams,
+                'food_rating': row['food_rating'],
+                'beverage_name': bev_name,
+                'beverage_grams': row['beverage_grams'],
+                'beverage_rating': row['beverage_rating'],
+            })
+
+        # 🔁 Compute sufficiency
+        body_mass = float(crew_mass_map[name])
+        unique_days = crew_meals['day'].nunique()
+        target_kcal = body_mass * 40 * unique_days
+
+        intake_ratio = scaled_kcal / target_kcal if target_kcal > 0 else 0
+
+        if intake_ratio < 0.85:
+            suff_status = 'insufficient'
+        elif intake_ratio < 0.95:
+            suff_status = 'moderate'
+        else:
+            suff_status = 'sufficient'
+
+        sufficiency_map[name] = {
+            'status': suff_status,
+            'intake_ratio': round(intake_ratio, 3)
+        }
+
+        print(f"📊 {name} target kcal = {round(target_kcal, 1)} | intake = {round(scaled_kcal, 1)} | ratio = {round(intake_ratio, 3)} → {suff_status}")
+
+    # 💥 Overwrite meal DB
+    conn = sqlite3.connect(MEAL_DB)
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM daily_meals")
+    cursor.execute("DELETE FROM crew_sufficiency")
+    conn.commit()
+    conn.close()
+
+    # 💾 Save new meals and sufficiency map
+    insert_daily_meals(MEAL_DB, final_meals, sufficiency_map)
+    return "✅ Rationed meals updated and saved."
+
 
 @app.route('/meal_log')
-def meal_log():    
+def meal_log():
     import sqlite3
     import pandas as pd
     from db_utils import (
         fetch_all_records,
         get_all_nutrition_data,
         get_latest_remaining_mass_budget,
-        insert_daily_meals
+        insert_daily_meals,
+        get_last_meal_day,
+        load_sufficiency_map
     )
     from planner import MealPlanner
 
     DB_PATH = 'astronauts.db'
-    TABLE_NAME = 'crew'
     MEAL_DB = 'meal_schedule.db'
     duration = get_latest_duration_from_gas_budget()
     meals_per_day = 3
+    min_kcal_per_meal = 400
+    min_kcal_per_day = min_kcal_per_meal * meals_per_day
 
-    # Ensure table exists
+    # Check if daily_meals table exists and needs to be filled
     conn = sqlite3.connect(MEAL_DB)
     cursor = conn.cursor()
     cursor.execute("""
@@ -182,44 +501,69 @@ def meal_log():
         );
     """)
     conn.commit()
-
-    # Get current row count
     cursor.execute("SELECT COUNT(*) FROM daily_meals")
     current_rows = cursor.fetchone()[0]
     conn.close()
 
-    # Load astronaut info
-    crew_df = fetch_all_records(DB_PATH, TABLE_NAME)
+    crew_df = fetch_all_records(DB_PATH, 'crew')
     crew_names = crew_df['name'].tolist()
     body_masses = [float(m) for m in crew_df['mass'].tolist()]
     total_meals_expected = len(crew_names) * duration * meals_per_day
 
-    # Generate meals if needed
+    sufficiency_map = None
+
     if current_rows < total_meals_expected:
         print("📅 Generating missing meal plans...")
         food_df, beverage_df, food_ratings, beverage_ratings = get_all_nutrition_data()
         mass_budget = get_latest_remaining_mass_budget()
         all_meals = []
+        sufficiency_map = {}
 
         for name, mass in zip(crew_names, body_masses):
-            calorie_target = round(mass * 40, 2)
+            baseline_target = round(mass * 40, 2)  # ✅ daily need (e.g., 2400 kcal)
             last_day = get_last_meal_day(MEAL_DB, name)
+
+            crew_food_ratings = food_ratings[food_ratings['crew_name'] == name].set_index('food_name')['rating'].to_dict()
+            crew_bev_ratings = beverage_ratings[beverage_ratings['crew_name'] == name].set_index('beverage_name')['rating'].to_dict()
+
+            crew_foods = food_df.copy()
+            crew_foods['rating'] = crew_foods['name'].str.lower().map(lambda x: crew_food_ratings.get(x, 0))
+            eligible_foods = crew_foods[crew_foods['rating'] > 1]
+
+            crew_bevs = beverage_df.copy()
+            crew_bevs['rating'] = crew_bevs['name'].str.lower().map(lambda x: crew_bev_ratings.get(x, 0))
+            eligible_bevs = crew_bevs[crew_bevs['rating'] > 1]
+
+            avg_food_cpg = eligible_foods['calories_per_gram'].mean() if not eligible_foods.empty else 1.5
+            avg_bev_cpg = eligible_bevs['calories_per_gram'].mean() if not eligible_bevs.empty else 0.5
+            avg_kcal_per_gram = (avg_food_cpg + avg_bev_cpg) / 2
+
+            # Estimate how many kcal we can reasonably support
+            per_person_mass_budget = mass_budget / len(crew_names)
+            water_mass_per_day = 3 * 250 / 1000
+            food_mass_limit = max(per_person_mass_budget - water_mass_per_day, 0.01)
+            estimated_max_kcal = food_mass_limit * avg_kcal_per_gram
+
+            adjusted_target = max(min(baseline_target, estimated_max_kcal), min_kcal_per_day)
 
             for start_day in range(last_day + 1, duration + 1, 7):
                 planner = MealPlanner(
                     name=name,
-                    calorie_target=calorie_target,
+                    calorie_target=adjusted_target,  # ✅ per-day target, not total
                     food_list=food_df.to_dict('records'),
                     beverage_list=beverage_df.to_dict('records'),
-                    food_ratings=food_ratings[food_ratings['crew_name'] == name]
-                        .set_index('food_name')['rating'].to_dict(),
-                    beverage_ratings=beverage_ratings[beverage_ratings['crew_name'] == name]
-                        .set_index('beverage_name')['rating'].to_dict(),
+                    food_ratings=crew_food_ratings,
+                    beverage_ratings=crew_bev_ratings,
                     duration=min(7, duration - start_day + 1),
                     start_day=start_day
                 )
 
                 result = planner.plan_within_mass_budget(mass_budget)
+
+                sufficiency_map[name] = {
+                    'status': result['sufficiency_status'],
+                    'intake_ratio': result['intake_ratio']
+                }
 
                 for meal in result['schedule']:
                     meal['crew_name'] = name
@@ -231,7 +575,7 @@ def meal_log():
                 all_meals.extend(result['schedule'])
 
         print(f"✅ Inserting {len(all_meals)} total meals for all crew")
-        insert_daily_meals(MEAL_DB, all_meals)
+        insert_daily_meals(MEAL_DB, all_meals, sufficiency_map)
 
     # Load for display
     conn = sqlite3.connect(MEAL_DB)
@@ -240,14 +584,30 @@ def meal_log():
 
     grouped = {}
     for _, row in df.iterrows():
-        crew_name = row['crew_name']
-        if crew_name not in grouped:
-            grouped[crew_name] = []
-        grouped[crew_name].append(row.to_dict())
+        grouped.setdefault(row['crew_name'], []).append(row.to_dict())
 
     calendar_data = [{'crew': crew, 'schedule': meals} for crew, meals in grouped.items()]
-    return render_template('meal_calendar.html', calendar_data=calendar_data)
 
+    if sufficiency_map is None:
+        conn = sqlite3.connect(MEAL_DB)
+        sufficiency_map = load_sufficiency_map(conn)
+        conn.close()
+
+    return render_template('meal_calendar.html', calendar_data=calendar_data, sufficiency_map=sufficiency_map)
+
+@app.route('/regenerate_meals', methods=['POST'])
+def regenerate_meals():
+    import sqlite3
+
+    # Wipe existing meals
+    conn = sqlite3.connect('meal_schedule.db')
+    cursor = conn.cursor()
+    cursor.execute("DROP TABLE IF EXISTS daily_meals;")
+    conn.commit()
+    conn.close()
+
+    print("🧼 Meal schedule wiped. Redirecting to /meal_log to regenerate.")
+    return redirect('/meal_log')
 
 
 

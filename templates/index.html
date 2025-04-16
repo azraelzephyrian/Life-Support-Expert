@@ -2,64 +2,133 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Life Support Expert System</title>
-    <title>(Space Picnic Planner)</title>
+    <title>Spacecraft Life Support Planner</title>
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600&display=swap');
+
         body {
-            font-family: Arial, sans-serif;
-            margin: 40px auto;
-            max-width: 800px;
-            padding: 20px;
-            background: #f9f9f9;
+            font-family: 'Orbitron', sans-serif;
+            margin: 0;
+            padding: 40px;
+            background-image: url('/static/images/cupola-audio-terminal-unit.jpg');
+            background-size: cover;
+            background-attachment: fixed;
+            background-position: center;
+            color: #fff;
         }
-        h1 { text-align: center; }
-        label { display: block; margin-top: 15px; }
+
+        h1, h2 {
+            text-align: center;
+            color: #ffffff;
+            text-shadow: 0 0 8px #000;
+        }
+
+        form {
+            background-color: rgba(0, 0, 0, 0.65);
+            padding: 20px;
+            margin: 20px auto;
+            max-width: 800px;
+            border-radius: 12px;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+        }
+
+        label {
+            display: block;
+            margin-top: 15px;
+        }
+
         input, select {
             width: 100%;
             padding: 8px;
             margin-top: 5px;
+            background: #111;
+            color: #fff;
+            border: 1px solid #444;
+            border-radius: 6px;
         }
+
         button {
             margin-top: 20px;
-            padding: 10px 15px;
+            padding: 12px 20px;
             font-size: 16px;
-        }
-        .results {
-            margin-top: 30px;
-            background: #eef;
-            padding: 20px;
+            background-image: url('/static/images/beautiful-space-background-vector.jpg');
+            background-size: cover;
+            color: white;
+            border: none;
             border-radius: 8px;
+            font-weight: bold;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.4);
+            transition: 0.3s ease;
+            cursor: pointer;
         }
+
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 18px rgba(255, 255, 255, 0.6);
+        }
+
+        .results {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 30px;
+        }
+
         .error {
             color: red;
-            background: #fee;
+            background: #330000;
             padding: 10px;
             border-radius: 5px;
         }
+
         .crew-table {
             width: 100%;
             margin-top: 20px;
+            background: rgba(255, 255, 255, 0.1);
+            border-collapse: collapse;
         }
+
         .crew-table th, .crew-table td {
             text-align: left;
-            padding: 5px;
+            padding: 8px;
+            border-bottom: 1px solid #ccc;
+        }
+
+        table {
+            width: 100%;
+        }
+
+        th {
+            background: rgba(0, 0, 0, 0.5);
+        }
+
+        td, th {
+            color: #eee;
         }
     </style>
+
     <script>
         function toggleCO2Options() {
             const scrubberBox = document.getElementById('use_scrubber');
             const recyclerBox = document.getElementById('use_recycler');
 
-            // Enforce mutual exclusivity
             if (scrubberBox.checked) recyclerBox.checked = false;
             if (recyclerBox.checked) scrubberBox.checked = false;
 
             document.getElementById('scrubber-fields').style.display = scrubberBox.checked ? 'block' : 'none';
             document.getElementById('recycler-fields').style.display = recyclerBox.checked ? 'block' : 'none';
         }
+
+        window.onload = function() {
+            const waterBox = document.getElementById('use_water_recycler');
+            waterBox.addEventListener('change', function() {
+                document.getElementById('water-recycler-fields').style.display = this.checked ? 'block' : 'none';
+            });
+        }
     </script>
 </head>
 <body>
+    <img id="floating-astro" src="{{ url_for('static', filename='images/Bruce_McCandless_II_during_EVA_in_1984.png') }}" alt="Astronaut Floating">
     <h1>Spacecraft Life Support Planner</h1>
 
     <!-- Crew Input -->
@@ -91,7 +160,7 @@
     <!-- Life Support Input -->
     <form method="POST">
         <label for="duration">Mission Duration (days):</label>
-        <input type="number" name="duration" required>
+        <input type="number" name="duration" value = "21" required>
 
         <label for="activity">Activity Level:</label>
         <select name="activity" required>
@@ -124,7 +193,7 @@
 
 
         <label for="weight_limit">Life Support Mass Budget (kg):</label>
-        <input type="number" name="weight_limit" step="0.01" required>
+        <input type="number" name="weight_limit" step="0.01" value = "850" required>
 
         <!-- Scrubber/Recycler Toggle -->
         <label>
@@ -178,10 +247,10 @@
             </tbody>
             </table>
             <label for="co2_scrubber_efficiency">Scrubber Efficiency (% CO₂ removed):</label>
-            <input type="number" name="co2_scrubber_efficiency" step="0.1">
+            <input type="number" name="co2_scrubber_efficiency" value = "0.98" step="0.1">
 
             <label for="scrubber_weight_per_kg">Scrubber Mass per kg CO₂ (kg):</label>
-            <input type="number" name="scrubber_weight_per_kg" step="0.01">
+            <input type="number" name="scrubber_weight_per_kg" value = "0.4" step="0.01">
         </div>
 
         <!-- Recycler Fields -->
@@ -217,17 +286,51 @@
                 <p><strong>Net Water Mass Needed:</strong> {{ results.water_net }} g</p>
                 <p><strong>Gas and Water Mass:</strong> {{ results.get('total_life_support_mass', 'N/A') }} kg</p>
                 <p><strong>Cumulative Meal and Beverage Mass:</strong> {{ results.cumulative_meal_mass }} kg</p>
+                <p><strong>Base Weight Limit:</strong> {{ results.base_weight_limit }} kg</p>
+                <p><strong>Food-Adjusted Weight Limit:</strong> {{ results.adjusted_weight_limit }} kg</p>
                 <p><strong>Combined Life Support Mass:</strong> {{ results.combined_life_support_mass }} kg</p>
                 <p><strong>Status:</strong>
-                    {% if results.within_limit %}
-                        ✅ Within mass limit!
-                    {% else %}
-                        ❌ Exceeds mass limit.
-                    {% endif %}
+                {% if results.live_over_limit %}
+                    ✅ Within mass limit!
+                {% else %}
+                    <div style="color: red; font-weight: bold;">
+                        ❌ Exceeds mass limit: ({{ results.combined_life_support_mass }} kg > {{ results.base_weight_limit }} kg)<br>
+                        Proceed to food rationing,<br>
+                        skip water recycler or<br>
+                        select a more efficient CO₂ solution
+                    </div>
+                {% endif %}
+                
                 </p>
             {% endif %}
         </div>
-    {% endif %}
+        
+    {% endif %}    
+    <form action="{{ url_for('clear_database') }}" method="get" onsubmit="return confirm('Are you sure you want to clear the gas budget database?');">
+        <button type="submit" style="margin-top: 20px; padding: 10px 15px; background-color: #c62828; color: white; border: none; border-radius: 5px; cursor: pointer;">
+            🧨 Clear Gas Budget Database
+        </button>
+    </form>
+    
+    <script>
+    document.getElementById("ration-button").addEventListener("click", async function(event) {
+        event.preventDefault(); // prevent full form submission if inside one
+        try {
+            const res = await fetch("/ration", { method: "GET" });
+            if (res.ok) {
+                location.reload(); // reload current page after success
+            } else {
+                alert("⚠️ Rationing failed. Check logs.");
+            }
+        } catch (err) {
+            console.error("Rationing error:", err);
+            alert("❌ Could not complete rationing.");
+        }
+    });
+    </script>
+    
+
+    
 </body>
 <form action="/setup_foods" method="GET">
     <button type="submit">Edit Food Database →</button>
@@ -235,5 +338,6 @@
 <form action="/meal_log" method="GET">
     <button>📅 View Meal Log from Database</button>
 </form>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
 </html>
 

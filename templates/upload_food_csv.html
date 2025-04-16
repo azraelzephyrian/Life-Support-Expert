@@ -3,14 +3,128 @@
 <head>
     <meta charset="UTF-8">
     <title>Upload Food CSV</title>
+
+    <!-- Fonts and base style -->
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@600&family=Inter:wght@400;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
+
     <style>
-        body { font-family: Arial; max-width: 700px; margin: 30px auto; background: #f0f0f0; padding: 20px; }
-        form { background: white; padding: 20px; border-radius: 8px; }
-        input[type="file"] { margin-top: 10px; }
-        button { margin-top: 20px; padding: 10px 15px; }
+        body {
+            background: url('/static/images/cupola-audio-terminal-unit.jpg') no-repeat center center fixed;
+            background-size: cover;
+            margin: 0;
+            padding: 40px;
+            font-family: 'Inter', sans-serif;
+            color: #f0f0f0;
+        }
+
+        h1 {
+            font-family: 'Orbitron', sans-serif;
+            text-align: center;
+            color: #fff;
+            text-shadow: 0 0 6px rgba(0,0,0,0.8);
+        }
+
+        p {
+            text-align: center;
+            font-size: 16px;
+            margin-bottom: 30px;
+        }
+
+        form.upload-form {
+            background-color: rgba(0, 0, 0, 0.65);
+            backdrop-filter: blur(8px);
+            padding: 30px;
+            max-width: 600px;
+            margin: 0 auto;
+            border-radius: 10px;
+            box-shadow: 0 0 12px rgba(255, 255, 255, 0.1);
+        }
+
+        label {
+            font-family: 'Orbitron', sans-serif;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        input[type="file"] {
+            width: 100%;
+            padding: 10px;
+            margin-top: 5px;
+            background: #111;
+            color: #fff;
+            border: 1px solid #444;
+            border-radius: 6px;
+        }
+
+        button {
+            background-image: url('/static/images/beautiful-space-background-vector.jpg');
+            background-size: cover;
+            background-position: center;
+            color: white;
+            font-family: 'Orbitron', sans-serif;
+            font-size: 15px;
+            font-weight: bold;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 8px;
+            margin-top: 20px;
+            margin-right: 10px;
+            cursor: pointer;
+            box-shadow: 0 0 12px rgba(255, 255, 255, 0.25);
+            transition: all 0.3s ease;
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 18px rgba(255, 255, 255, 0.4);
+        }
+
+        .button-row {
+            display: flex;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 40px;
+        }
+
+        #floating-astro {
+            position: fixed;
+            top: 30%;
+            left: 2%;
+            width: 180px;
+            opacity: 1.0;
+            transform: translate(-50%, -50%);
+            z-index: 0;  /* 👈 behind all content */
+            animation: drift-astro 60s linear infinite alternate;
+            pointer-events: none;
+            filter: drop-shadow(0 0 6px rgba(255,255,255,0.5));
+        }
+
+
+        /* Floating motion */
+        @keyframes drift-astro {
+            0% {
+                transform: translate(0, 0) rotate(-10deg) scale(1.0);
+            }
+            30% {
+                transform: translate(-120px, 40px) rotate(8deg) scale(1.00);
+            }
+            60% {
+                transform: translate(100px, -80px) rotate(12deg) scale(1.00);
+            }
+            90% {
+                transform: translate(70px, 70px) rotate(-18deg) scale(1.00);
+            }
+            100% {
+                transform: translate(-50px, -30px) rotate(-2deg) scale(1.00);
+            }
+
+        }
     </style>
 </head>
 <body>
+    <img id="floating-astro" src="{{ url_for('static', filename='images/Bruce_McCandless_II_during_EVA_in_1984.png') }}" alt="Astronaut Floating">
     <h1>Upload Food CSV</h1>
     <form method="POST" enctype="multipart/form-data">
         <label>Select a .csv file with food data:</label><br>
@@ -23,7 +137,10 @@
     </form>
 </body>
 <form action="/" method="GET">
-    <button type="start">Edit Food Database →</button>
+    <button type="start">Go Back Home</button>
+</form>
+<form action="/setup_foods" method="GET">
+    <button>← Food Setup</button>
 </form>
 <form action="/meal_log" method="GET">
     <button>📅 View Meal Log from Database</button>

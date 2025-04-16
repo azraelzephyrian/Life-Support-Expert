@@ -63,17 +63,27 @@ def get_latest_remaining_mass_budget(gas_db_path='gas_budget.db'):
     conn = sqlite3.connect(gas_db_path)
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT weight_limit, total_gas_mass
+        SELECT base_weight_limit, total_gas_mass
         FROM gas_masses
         ORDER BY timestamp DESC
         LIMIT 1
     """)
     row = cursor.fetchone()
     conn.close()
+
     if row:
-        weight_limit, gas_mass = row
-        return round(weight_limit - gas_mass, 2)
-    return None
+        base_weight_limit, gas_mass = row
+        if base_weight_limit is None:
+            raise ValueError("⚠️ base_weight_limit is NULL in the latest gas budget entry.")
+        if gas_mass is None:
+            raise ValueError("⚠️ total_gas_mass is NULL in the latest gas budget entry.")
+        return round(base_weight_limit - gas_mass, 2)
+
+    raise ValueError("⚠️ No gas budget record found.")
+
+
+
+
 
 def get_all_nutrition_data(food_path='nutrition.db', beverage_path='beverage.db'):
     import pandas as pd
@@ -142,15 +152,81 @@ def init_nutrition_db(db_path='nutrition.db'):
     conn.commit()
     conn.close()
 
-def insert_daily_meals(db_path, meals: list):
+def load_sufficiency_map(conn):
+    query = "SELECT crew_name, sufficiency_status, intake_ratio FROM crew_sufficiency"
+    df = pd.read_sql(query, conn)
+
+    # Build a dict: {crew_name: {'status': ..., 'intake_ratio': ...}}
+    sufficiency_map = {}
+    for _, row in df.iterrows():
+        sufficiency_map[row['crew_name']] = {
+            'status': row['sufficiency_status'],
+            'intake_ratio': row['intake_ratio']
+        }
+    return sufficiency_map
+
+
+def get_latest_gas_mass():
+    import sqlite3
+    conn = sqlite3.connect("gas_budget.db")
+    conn.row_factory = sqlite3.Row  # Required for name-based access
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT total_gas_mass, weight_limit, base_weight_limit
+        FROM gas_masses
+        ORDER BY id DESC
+        LIMIT 1
+    """)
+    row = cursor.fetchone()
+    conn.close()
+
+    if row:
+        gas_mass = row["total_gas_mass"]
+        weight_limit = row["weight_limit"]
+        base_weight_limit = row["base_weight_limit"]
+        return gas_mass, weight_limit, base_weight_limit
+    else:
+        return 0, 0, 0
+
+
+
+def get_cumulative_meal_mass():
+    import sqlite3
+    conn = sqlite3.connect("meal_schedule.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT SUM(food_grams + beverage_grams) FROM daily_meals")
+    row = cursor.fetchone()
+    conn.close()
+    total_grams = row[0] if row and row[0] else 0
+    return round(total_grams / 1000.0, 2)  # convert g to kg
+
+def get_last_meal_day(db_path, crew_name):
+    """
+    Returns the last day number that has a meal assigned for the given crew member.
+    If no meals exist, returns 0.
+    """
+    import sqlite3
+
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT MAX(day) FROM daily_meals WHERE crew_name = ?
+    """, (crew_name,))
+    result = cursor.fetchone()[0]
+    conn.close()
+    return result if result is not None else 0
+
+
+def insert_daily_meals(db_path, meals: list, sufficiency_map: dict):
     """
     Insert a list of meal dicts into the daily_meals table.
-    Each dict must include: crew_name, day, meal, food_name, food_grams, etc.
+    Also insert sufficiency status and intake ratio into crew_sufficiency.
     """
     conn = sqlite3.connect(db_path)
     cursor = conn.cursor()
 
-    # Ensure the table exists
+    # Ensure the daily_meals table exists
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS daily_meals (
             crew_name TEXT,
@@ -166,6 +242,16 @@ def insert_daily_meals(db_path, meals: list):
         );
     """)
 
+    # Ensure the sufficiency table exists
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS crew_sufficiency (
+            crew_name TEXT PRIMARY KEY,
+            sufficiency_status TEXT,
+            intake_ratio REAL
+        );
+    """)
+
+    # Insert meals
     for m in meals:
         cursor.execute("""
             INSERT OR REPLACE INTO daily_meals (
@@ -179,8 +265,23 @@ def insert_daily_meals(db_path, meals: list):
             m['beverage_name'], m['beverage_grams'], m.get('beverage_rating', None)
         ))
 
+    # Insert sufficiency info with intake ratio
+    for crew_name, summary in sufficiency_map.items():
+        status = summary['status']
+        ratio = summary['intake_ratio']
+        print(f"🚀 Inserting sufficiency for {crew_name}: {status}, {ratio}")
+        cursor.execute("""
+            INSERT OR REPLACE INTO crew_sufficiency (
+                crew_name, sufficiency_status, intake_ratio
+            ) VALUES (?, ?, ?);
+        """, (
+            crew_name, status, ratio
+        ))
+
     conn.commit()
     conn.close()
+
+
 
 
 def get_latest_duration_from_gas_budget(db_path='gas_budget.db'):
@@ -192,6 +293,9 @@ def get_latest_duration_from_gas_budget(db_path='gas_budget.db'):
     return int(result[0]) if result else 7  # fallback to 7 if no entry
 
 def insert_gas_budget(db_path, data: dict):
+    if data.get("base_weight_limit") is None:
+        raise ValueError("🛑 Attempted to insert gas_mass record with NULL base_weight_limit.")
+
     """
     Insert a new gas budget record into the gas_masses table.
     Creates the table if it doesn't exist.
@@ -237,8 +341,9 @@ def insert_gas_budget(db_path, data: dict):
             water_recycler_efficiency REAL,
             cumulative_meal_mass REAL,
             combined_life_support_mass REAL,
-            'water_recycler_mass' REAL
-
+            'water_recycler_mass' REAL,
+            'total_life_support_mass' REAL,
+            base_weight_limit REAL
         );
     """)
 
@@ -249,6 +354,70 @@ def insert_gas_budget(db_path, data: dict):
     cursor.execute(query, tuple(data.values()))
     conn.commit()
     conn.close()
+
+def get_latest_gas_budget_record(db_path='gas_budget.db'):
+    import sqlite3
+
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    cursor = conn.cursor()
+
+    # Ensure the table exists
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS gas_masses (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT,
+            duration INTEGER,
+            crew_count INTEGER,
+            body_masses TEXT,
+            activity TEXT,
+            oxygen_tank_weight_per_kg REAL,
+            co2_generated REAL,
+            o2_required_kg REAL,
+            o2_reclaimed REAL,
+            o2_tank_mass REAL,
+            scrubber_mass REAL,
+            recycler_mass REAL,
+            total_gas_mass REAL,
+            use_scrubber BOOLEAN,
+            use_recycler BOOLEAN,
+            co2_scrubber_efficiency REAL,
+            scrubber_weight_per_kg REAL,
+            co2_recycler_efficiency REAL,
+            recycler_weight REAL,
+            within_limit BOOLEAN,
+            weight_limit REAL,
+
+            -- New fields
+            nitrogen_tank_weight_per_kg REAL,
+            n2_required_kg REAL,
+            n2_tank_mass REAL,
+            hygiene_water_per_day REAL,
+            water_hygiene_raw REAL,
+            water_excretion REAL,
+            water_recovered REAL,
+            water_net REAL,
+            use_water_recycler BOOLEAN,
+            water_recycler_efficiency REAL,
+            cumulative_meal_mass REAL,
+            combined_life_support_mass REAL,
+            'water_recycler_mass' REAL,
+            'total_life_support_mass' REAL,
+            base_weight_limit REAL
+
+        );
+    """)
+
+    # Try to fetch the most recent record
+    cursor.execute("""
+        SELECT * FROM gas_masses
+        ORDER BY timestamp DESC
+        LIMIT 1;
+    """)
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
+
 
 def get_cumulative_meal_mass(meal_db_path='meal_schedule.db'):
     import sqlite3
