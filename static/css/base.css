@@ -158,10 +158,20 @@ body::after {
     width: 180px;
     opacity: 1.0;
     transform: translate(-50%, -50%);
-    z-index: 0;  /* 👈 behind all content */
+    z-index: -1;  /* 👈 behind all content */
     animation: drift-astro 60s linear infinite alternate;
     pointer-events: none;
     filter: drop-shadow(0 0 6px rgba(255,255,255,0.5));
+}
+#cupola-frame {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    object-fit: cover;
+    z-index: 0; /* Must be higher than #floating-astro (z-index: 0) */
+    pointer-events: none; /* Let clicks pass through */
 }
 
 

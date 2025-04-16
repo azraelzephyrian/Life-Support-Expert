@@ -9,15 +9,28 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
 
     <style>
+
         body {
-            background: url('/static/images/cupola-audio-terminal-unit.jpg') no-repeat center center fixed;
-            background-size: cover;
             margin: 0;
             padding: 40px;
-            font-family: 'Inter', sans-serif;
-            color: #f0f0f0;
+            position: relative;
+            z-index: 0;
+            overflow-x: hidden;
         }
 
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 100%;
+            background: url('/static/images/cupola-audio-terminal-unit.jpg') no-repeat center center;
+            background-size: cover;
+            z-index: -3; /* Sit behind everything */
+            pointer-events: none;
+            will-change: transform, opacity;
+        }
         h1 {
             font-family: 'Orbitron', sans-serif;
             text-align: center;
@@ -32,13 +45,16 @@
         }
 
         form.upload-form {
-            background-color: rgba(0, 0, 0, 0.65);
-            backdrop-filter: blur(8px);
+            background-color: #0a0a0a;
+            background-image: linear-gradient(rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.65));
             padding: 30px;
             max-width: 600px;
             margin: 0 auto;
             border-radius: 10px;
             box-shadow: 0 0 12px rgba(255, 255, 255, 0.1);
+            position: relative;
+            z-index: 5;
+            transform: translateZ(0); /* ✅ Prevents raster artifacts */
         }
 
         label {
@@ -95,7 +111,7 @@
             width: 180px;
             opacity: 1.0;
             transform: translate(-50%, -50%);
-            z-index: 0;  /* 👈 behind all content */
+            z-index: -2;  /* 👈 behind all content */
             animation: drift-astro 60s linear infinite alternate;
             pointer-events: none;
             filter: drop-shadow(0 0 6px rgba(255,255,255,0.5));
@@ -121,9 +137,20 @@
             }
 
         }
+        #cupola-frame {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            object-fit: cover;
+            z-index: -1; /* Must be higher than #floating-astro (z-index: 0) */
+            pointer-events: none; /* Let clicks pass through */
+        }
     </style>
 </head>
 <body>
+    <img id="cupola-frame" src="{{ url_for('static', filename='images/cupola-audio-terminal-unit.png') }}" alt="Cupola Frame Overlay">
     <img id="floating-astro" src="{{ url_for('static', filename='images/Bruce_McCandless_II_during_EVA_in_1984.png') }}" alt="Astronaut Floating">
     <h1>Upload Food CSV</h1>
     <form method="POST" enctype="multipart/form-data">

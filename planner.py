@@ -110,13 +110,12 @@ class MealPlanner(KnowledgeEngine):
 
         for food in self.foods:
             cpg = food['calories_per_gram']
-            grams = round(self.per_meal_kcal / cpg, 2) if cpg > 0 else 0
             self.declare(FoodOption(
                 food_name=food['food_name'],
                 calories_per_gram=cpg,
-                rating=food['rating'],
-                target_grams=grams
+                rating=food['rating']
             ))
+
 
         for bev in self.beverages:
             self.declare(BeverageOption(
@@ -179,18 +178,19 @@ class MealPlanner(KnowledgeEngine):
         AS.food << FoodOption(
             food_name=MATCH.fname,
             calories_per_gram=MATCH.cpg,
-            rating=MATCH.rating,
-            target_grams=MATCH.grams
+            rating=MATCH.rating
         ),
         TEST(lambda fname, last_food: last_food is None or fname != last_food),
         salience=2
     )
-    def assign_food(self, food, fname, cpg, rating, grams, day, meal, name, last_food, last_bev):
+    def assign_food(self, food, fname, cpg, rating, day, meal, name, last_food, last_bev):
         if self.slot_already_assigned(SelectedFood, day, meal):
             return
 
         if not self.is_food_allowed(fname, day, meal):
             return
+
+        grams = round(self.per_meal_kcal / cpg, 2) if cpg > 0 else 0
 
         self.last_food = fname
         self.declare(SelectedFood(
@@ -199,6 +199,8 @@ class MealPlanner(KnowledgeEngine):
             day=day,
             meal=meal
         ))
+
+
 
 
 
@@ -272,35 +274,57 @@ class MealPlanner(KnowledgeEngine):
         self.retract(food_f)
         self.retract(bev_f)
         self.retract(slot)
-
-    def plan_within_mass_budget(self, mass_budget, min_fraction=0.6, step=0.01):
+        
+    def plan_within_mass_budget(self, mass_budget):
         """
-        Iteratively decrease ration_fraction until total_mass fits mass_budget,
-        or until a complete schedule is generated.
+        Estimate a safe ration_fraction using actual food and beverage densities,
+        then plan meals once using that fraction. Enforces mass budget strictly.
         """
-        fraction = 1.0
+        self.daily_target = self.original_target / self.duration  # kcal/day
         expected_meals = self.duration * self.meals_per_day
-        self.daily_target = self.original_target / self.duration  # Fixed baseline per day
 
-        while fraction >= min_fraction:
-            self.ration_fraction = fraction
-            self.calorie_target = self.daily_target * self.ration_fraction
-            self.per_meal_kcal = self.calorie_target / self.meals_per_day
-            self.schedule.clear()
+        # 🧠 Estimate average kcal/g for eligible foods and beverages
+        avg_food_cpg = (
+            sum(f['calories_per_gram'] for f in self.foods) / len(self.foods)
+            if self.foods else 1.5
+        )
+        avg_bev_cpg = (
+            sum(b['calories_per_gram'] for b in self.beverages) / len(self.beverages)
+            if self.beverages else 0.4
+        )
 
-            result = self.run_planner()
+        # 🔍 Estimate average grams per meal
+        water_grams_per_meal = self.water_per_meal
+        avg_bev_kcal_per_meal = water_grams_per_meal * avg_bev_cpg
+        avg_food_kcal_per_meal = self.daily_target / self.meals_per_day - avg_bev_kcal_per_meal
+        avg_food_grams_per_meal = avg_food_kcal_per_meal / avg_food_cpg if avg_food_cpg > 0 else 0
 
-            # Exit if we hit all meals or already meet mass constraint
-            if len(result['schedule']) >= expected_meals and result['total_mass'] <= mass_budget:
-                result['ration_fraction'] = round(fraction, 3)
-                return result
+        # 🧮 Total estimated mass
+        total_food_grams = avg_food_grams_per_meal * expected_meals
+        total_bev_grams = water_grams_per_meal * expected_meals
+        estimated_total_kg = (total_food_grams + total_bev_grams) / 1000.0
 
-            fraction -= step
+        # 🔁 Adjust fraction if over budget
+        estimated_fraction = min(1.0, mass_budget / estimated_total_kg)
 
-        # Return last attempted result if all failed
-        result['ration_fraction'] = round(fraction + step, 3)
-        result['warning'] = f"Unable to meet mass budget of {mass_budget} kg above {min_fraction*100}% rationing."
+        # 🧪 Apply and run
+        self.ration_fraction = estimated_fraction
+        self.calorie_target = self.daily_target * self.ration_fraction
+        self.per_meal_kcal = self.calorie_target / self.meals_per_day
+        self.schedule.clear()
+
+        result = self.run_planner()
+        result['ration_fraction'] = round(self.ration_fraction, 3)
+
+        if len(result['schedule']) < expected_meals:
+            result['warning'] = "⚠️ Partial schedule generated — not all meals assigned."
+
+        if result['total_mass'] > mass_budget:
+            result['warning'] = f"⚠️ Plan exceeds budget: {result['total_mass']} kg > {mass_budget} kg"
+
         return result
+
+
 
 
 

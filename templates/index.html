@@ -12,9 +12,10 @@
             padding: 40px;
             background-image: url('/static/images/cupola-audio-terminal-unit.jpg');
             background-size: cover;
-            background-attachment: fixed;
+            background-attachment: scroll;
             background-position: center;
             color: #fff;
+            z-index: -3;
         }
 
         h1, h2 {
@@ -24,13 +25,18 @@
         }
 
         form {
-            background-color: rgba(0, 0, 0, 0.65);
+            background-color: #0a0a0a; /* dark solid fallback */
+            background-image: linear-gradient(rgba(0, 0, 0, 0.65), rgba(0, 0, 0, 0.65));
+            /* 👆 mimics transparency without triggering GPU compositor edge cases */
             padding: 20px;
             margin: 20px auto;
             max-width: 800px;
             border-radius: 12px;
             box-shadow: 0 0 10px rgba(255, 255, 255, 0.1);
+            position: relative;
+            z-index: 5;
         }
+
 
         label {
             display: block;
@@ -67,13 +73,6 @@
             box-shadow: 0 0 18px rgba(255, 255, 255, 0.6);
         }
 
-        .results {
-            background: rgba(0, 0, 0, 0.7);
-            padding: 20px;
-            border-radius: 10px;
-            margin-top: 30px;
-        }
-
         .error {
             color: red;
             background: #330000;
@@ -81,12 +80,14 @@
             border-radius: 5px;
         }
 
+        .results,
         .crew-table {
-            width: 100%;
-            margin-top: 20px;
-            background: rgba(255, 255, 255, 0.1);
-            border-collapse: collapse;
+            background-color: #0b0b0b;
+            background-image: linear-gradient(rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.7));
+            backdrop-filter: none; /* 🔥 remove for stability */
+            z-index: 5;
         }
+
 
         .crew-table th, .crew-table td {
             text-align: left;
@@ -105,6 +106,54 @@
         td, th {
             color: #eee;
         }
+        #floating-astro {
+            position: fixed;
+            top: 30%;
+            left: 2%;
+            width: 180px;
+            opacity: 1.0;
+            transform: translate(-50%, -50%);
+            z-index: -2;  /* 👈 behind all content */
+            animation: drift-astro 60s linear infinite alternate;
+            pointer-events: none;
+            filter: drop-shadow(0 0 6px rgba(255,255,255,0.5));
+        }
+        #cupola-frame {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            object-fit: cover;
+            z-index: -1; /* Must be higher than #floating-astro (z-index: 0) */
+            pointer-events: none; /* Let clicks pass through */
+        }
+
+
+        /* Floating motion */
+        @keyframes drift-astro {
+            0% {
+                transform: translate(0, 0) rotate(-10deg) scale(1.0);
+            }
+            30% {
+                transform: translate(-120px, 40px) rotate(8deg) scale(1.00);
+            }
+            60% {
+                transform: translate(100px, -80px) rotate(12deg) scale(1.00);
+            }
+            90% {
+                transform: translate(70px, 70px) rotate(-18deg) scale(1.00);
+            }
+            100% {
+                transform: translate(-50px, -30px) rotate(-2deg) scale(1.00);
+            }
+
+        }
+        #title-wrapper {
+            position: relative;
+            z-index: 10; /* higher than #cupola-frame */
+        }
+
     </style>
 
     <script>
@@ -128,8 +177,12 @@
     </script>
 </head>
 <body>
+    <img id="cupola-frame" src="{{ url_for('static', filename='images/cupola-audio-terminal-unit.png') }}" alt="Cupola Frame Overlay">
     <img id="floating-astro" src="{{ url_for('static', filename='images/Bruce_McCandless_II_during_EVA_in_1984.png') }}" alt="Astronaut Floating">
-    <h1>Spacecraft Life Support Planner</h1>
+    <div id="title-wrapper">
+        <h1>🚀Spacecraft Life Support Planner🌎</h1>
+    </div>
+    
 
     <!-- Crew Input -->
     <form method="POST" action="/add_or_edit_crew">
@@ -311,6 +364,12 @@
             🧨 Clear Gas Budget Database
         </button>
     </form>
+    <form action="{{ url_for('ration_meal_database') }}" method="post" style="margin-top: 20px;">
+        <button type="submit" style="padding: 10px 20px; font-size: 16px;">
+            🍽️ Apply Rationing and Refresh
+        </button>
+    </form>
+    
     
     <script>
     document.getElementById("ration-button").addEventListener("click", async function(event) {

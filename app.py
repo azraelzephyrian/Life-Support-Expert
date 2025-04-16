@@ -125,7 +125,7 @@ def index():
                 'live_over_limit': (
                     combined_life_support_mass is not None and
                     base_limit is not None and
-                    combined_life_support_mass < base_limit
+                    combined_life_support_mass < base_limit + 0.1
                 ),
 
                 # Oxygen
@@ -349,8 +349,10 @@ def clear_meals():
     print("🧼 Meal database cleared.")
     return redirect(url_for('meal_log'))  # or another relevant page
 
-@app.route('/ration')
+@app.route('/ration', methods=['POST'], endpoint='ration_meal_database')
 def ration_meal_database():
+    print("🚨 /ration endpoint called!")
+
     import sqlite3
     import pandas as pd
     from db_utils import (
@@ -396,7 +398,6 @@ def ration_meal_database():
         total_food_mass = crew_meals['food_grams'].sum()
         total_bev_mass = crew_meals['beverage_grams'].sum()
         scaling_ratio = min(1.0, (per_crew_budget - total_bev_mass / 1000.0) / (total_food_mass / 1000.0))
-
         print(f"\n🔍 {name} — Food Mass: {round(total_food_mass, 1)}g, Bev Mass: {round(total_bev_mass,1)}g, Budget: {round(per_crew_budget,2)}kg, Scaling Ratio: {round(scaling_ratio, 3)}")
 
         scaled_kcal = 0.0
@@ -408,13 +409,15 @@ def ration_meal_database():
 
             food_cpg = food_cpg_map.get(normalized_food, 0)
             bev_cpg = bev_cpg_map.get(normalized_bev, 0)
+            food_cpg = food_cpg_map.get(normalized_food, 0)
 
             scaled_food_grams = round(row['food_grams'] * scaling_ratio, 2)
             food_kcal = scaled_food_grams * food_cpg
-            bev_kcal = row['beverage_grams'] * bev_cpg
-            scaled_kcal += food_kcal + bev_kcal
+            scaled_kcal += food_kcal
 
-            print(f"  🍽️ {food_name}: {scaled_food_grams}g × {food_cpg} kcal/g + {row['beverage_grams']}g × {bev_cpg} kcal/g = {round(food_kcal + bev_kcal, 2)} kcal")
+            print(f"🧪 Scaling ratio for {name}: {scaling_ratio} | Old: {row['food_grams']}g → New: {scaled_food_grams}g")
+
+            print(f"  🍽️ {food_name}: {scaled_food_grams}g × {food_cpg} kcal/g = {round(food_kcal, 2)} kcal")
 
             final_meals.append({
                 'crew_name': name,
@@ -430,8 +433,20 @@ def ration_meal_database():
 
         # 🔁 Compute sufficiency
         body_mass = float(crew_mass_map[name])
-        unique_days = crew_meals['day'].nunique()
-        target_kcal = body_mass * 40 * unique_days
+        unique_days = len(set(m['day'] for m in final_meals if m['crew_name'] == name))
+        baseline_target = body_mass * 40  # kcal/day
+        avg_food_cpg = sum(food_cpg_map.values()) / len(food_cpg_map) if food_cpg_map else 1.5
+        avg_bev_cpg = sum(bev_cpg_map.values()) / len(bev_cpg_map) if bev_cpg_map else 0.5
+        avg_kcal_per_gram = (avg_food_cpg + avg_bev_cpg) / 2
+
+        per_person_mass_budget = total_budget / len(crew_names)
+        water_mass_per_day = 3 * 250 / 1000  # 750g
+        food_mass_limit = max(per_person_mass_budget - water_mass_per_day, 0.01)
+        estimated_max_kcal = food_mass_limit * avg_kcal_per_gram
+
+        adjusted_target = max(min(baseline_target, estimated_max_kcal), 1200)  # 400×3 min
+        target_kcal = adjusted_target * unique_days
+
 
         intake_ratio = scaled_kcal / target_kcal if target_kcal > 0 else 0
 
@@ -459,7 +474,8 @@ def ration_meal_database():
 
     # 💾 Save new meals and sufficiency map
     insert_daily_meals(MEAL_DB, final_meals, sufficiency_map)
-    return "✅ Rationed meals updated and saved."
+    referer = request.referrer or url_for('index')
+    return redirect(referer)
 
 
 @app.route('/meal_log')
