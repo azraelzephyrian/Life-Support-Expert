@@ -281,6 +281,7 @@
             <option value="/beverage_upload">📤 Upload Beverage CSV</option>
             <option value="/clear_all_databases">💾 Reset All Databases</option>
             <option value="/chat">🤖 Chat with AI Assistant</option>
+            <option value="/medical_assistant">🧬 Medical Assistant</option>
         </select>
     </div>
     <!-- Toggle Button -->
@@ -414,6 +415,17 @@
 
 </body>
 <script>
+        function clearChat() {
+            localStorage.removeItem("hal_chat_history");
+            localStorage.removeItem("hal_last_input");
+            document.getElementById("messages").innerHTML = "";
+            document.getElementById("userInput").value = "";
+
+            // Clear backend memory
+            fetch("/clear_memory", { method: "POST" })
+                .then(res => console.log("✅ Memory reset"))
+                .catch(err => console.error("❌ Failed to reset memory:", err));
+        }
     document.addEventListener("DOMContentLoaded", () => {
         const savedHistory = localStorage.getItem("hal_chat_history");
         if (savedHistory) {

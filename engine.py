@@ -36,16 +36,36 @@ class LifeSupportEngine(KnowledgeEngine):
             water_recycler_weight=MATCH.water_recycler_weight
         )
     )
-    def compute_life_support(self):
+    def compute_life_support(self, duration, crew_count, body_masses, activity,
+                         oxygen_tank_weight_per_kg, weight_limit,
+                         use_scrubber, use_recycler, co2_scrubber_efficiency,
+                         scrubber_weight_per_kg, co2_recycler_efficiency,
+                         recycler_weight, nitrogen_tank_weight_per_kg,
+                         hygiene_water_per_day, use_water_recycler,
+                         water_recycler_efficiency, water_recycler_weight):
+
         print("🚀 Rule matched. Searching for LifeSupportFacts...")
-        for f in self.facts.values():
-            print("🧾 Fact:", f)
+        print("🚀 LifeSupportFacts bound:")
+        print(f"📅 Duration: {duration} days")
+        print(f"👥 Crew count: {crew_count} members")
+        print(f"⚖️ Body masses: {body_masses}")
+        print(f"🏃 Activity level: {activity}")
+        print(f"🫧 Hygiene water/day: {hygiene_water_per_day} g")
+        print(f"🟦 O₂ tank mass/kg: {oxygen_tank_weight_per_kg}")
+        print(f"🟨 N₂ tank mass/kg: {nitrogen_tank_weight_per_kg}")
+        print(f"💧 Use water recycler: {use_water_recycler} (efficiency: {water_recycler_efficiency}%, mass: {water_recycler_weight} kg)")
+        print(f"🧪 Use scrubber: {use_scrubber} (efficiency: {co2_scrubber_efficiency}%, kg CO₂/kg scrubber: {scrubber_weight_per_kg})")
+        print(f"🔁 Use CO₂ recycler: {use_recycler} (efficiency: {co2_recycler_efficiency}%, mass: {recycler_weight} kg)")
+        print(f"🚫 Weight limit: {weight_limit} kg")
+
 
         # Grab the first matching LifeSupportFacts
+
         for f in self.facts.values():
-            if isinstance(f, LifeSupportFacts):
+            if isinstance(f, Fact) and all(k in f for k in ['duration', 'crew_count', 'body_masses']):
                 fact = f
                 break
+
         else:
             print("⚠️ No usable LifeSupportFacts found.")
             return

@@ -1,0 +1,28 @@
+[project]
+name = "spacecraft-life-support"
+version = "0.1.0"
+description = "An AI-powered web app for planning life support systems"
+authors = [
+    { name = "Alex Lewis", email = "alexis.diana.lewis@gmail.com" },
+    { name = "Harshita Ananthula", email = "harshitaananthula44@gmail.com" },
+]
+requires-python = ">=3.9"
+
+dependencies = [
+    "flask",
+    "experta",
+    "openai",
+    "pandas",
+    "python-dotenv"
+]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+exclude = ["__pycache__", "static", "templates", "uploads"]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"

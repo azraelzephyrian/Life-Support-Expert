@@ -84,11 +84,13 @@ def database_reset(db_name):
             CREATE TABLE food_ratings (
                 crew_name TEXT,
                 food_name TEXT,
-                rating INTEGER
+                rating INTEGER,
+                PRIMARY KEY (crew_name, food_name)
             );
             """
         ])
         return "✅ nutrition.db reset."
+
 
     elif db_name == "beverage.db":
         reset_db(db_name, [
@@ -107,11 +109,13 @@ def database_reset(db_name):
             CREATE TABLE beverage_ratings (
                 crew_name TEXT,
                 beverage_name TEXT,
-                rating INTEGER
+                rating INTEGER,
+                PRIMARY KEY (crew_name, beverage_name)
             );
             """
         ])
         return "✅ beverage.db reset."
+
 
     elif db_name == "astronauts.db":
         reset_db(db_name, [
@@ -394,10 +398,15 @@ def insert_food(name, calories_per_gram, fat_per_gram=0, sugar_per_gram=0, prote
     cursor.execute("""
         INSERT INTO foods (name, calories_per_gram, fat_per_gram, sugar_per_gram, protein_per_gram)
         VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(name) DO UPDATE SET
+            calories_per_gram = excluded.calories_per_gram,
+            fat_per_gram = excluded.fat_per_gram,
+            sugar_per_gram = excluded.sugar_per_gram,
+            protein_per_gram = excluded.protein_per_gram;
     """, (name, calories_per_gram, fat_per_gram, sugar_per_gram, protein_per_gram))
     conn.commit()
     conn.close()
-    return f"✅ Food '{name}' added."
+    return f"✅ Food '{name}' added or updated."
 
 def insert_beverage(name, calories_per_gram, fat_per_gram=0, sugar_per_gram=0, protein_per_gram=0):
     conn = sqlite3.connect("beverage.db")
@@ -405,10 +414,15 @@ def insert_beverage(name, calories_per_gram, fat_per_gram=0, sugar_per_gram=0, p
     cursor.execute("""
         INSERT INTO beverages (name, calories_per_gram, fat_per_gram, sugar_per_gram, protein_per_gram)
         VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(name) DO UPDATE SET
+            calories_per_gram = excluded.calories_per_gram,
+            fat_per_gram = excluded.fat_per_gram,
+            sugar_per_gram = excluded.sugar_per_gram,
+            protein_per_gram = excluded.protein_per_gram;
     """, (name, calories_per_gram, fat_per_gram, sugar_per_gram, protein_per_gram))
     conn.commit()
     conn.close()
-    return f"✅ Beverage '{name}' added."
+    return f"✅ Beverage '{name}' added or updated."
 
 def insert_food_rating(crew_name, food_name, rating):
     conn = sqlite3.connect("nutrition.db")
@@ -416,6 +430,8 @@ def insert_food_rating(crew_name, food_name, rating):
     cursor.execute("""
         INSERT INTO food_ratings (crew_name, food_name, rating)
         VALUES (?, ?, ?)
+        ON CONFLICT(crew_name, food_name) DO UPDATE SET
+            rating = excluded.rating;
     """, (crew_name, food_name, rating))
     conn.commit()
     conn.close()
@@ -427,15 +443,19 @@ def insert_beverage_rating(crew_name, beverage_name, rating):
     cursor.execute("""
         INSERT INTO beverage_ratings (crew_name, beverage_name, rating)
         VALUES (?, ?, ?)
+        ON CONFLICT(crew_name, beverage_name) DO UPDATE SET
+            rating = excluded.rating;
     """, (crew_name, beverage_name, rating))
     conn.commit()
     conn.close()
     return f"✅ Rating set: {crew_name} → {beverage_name} = {rating}"
 
+
 def insert_meal_schedule(meals, sufficiency_map=None):
     from db_utils import insert_daily_meals
     insert_daily_meals("meal_schedule.db", meals, sufficiency_map or {})
     return f"✅ {len(meals)} meals inserted."
+
 
 def insert_food_ratings(ratings: list):
     conn = sqlite3.connect("nutrition.db")
@@ -448,11 +468,66 @@ def insert_food_ratings(ratings: list):
         cursor.execute("""
             INSERT INTO food_ratings (crew_name, food_name, rating)
             VALUES (?, ?, ?)
+            ON CONFLICT(crew_name, food_name) DO UPDATE SET
+                rating = excluded.rating;
         """, (crew_name, food_name, rating))
 
     conn.commit()
     conn.close()
     return f"✅ Ratings saved for {len(ratings)} entries."
+
+# Dummy tool that kicks off a multi-turn medical interaction
+def start_medical_interview():
+    return {
+        "status": "🩺 Interview started.",
+        "instructions": "Please list any symptoms from the list, their severity, whether they are on a centrifuge and current mission day. def run_medical_diagnosis(symptoms: list, mission_day: int, centrifugal_habitat: bool = False)"
+    }
+
+# Real execution tool
+def run_medical_diagnosis(symptoms: list, mission_day: int, centrifugal_habitat: bool = False):
+    from experta import Fact
+    from medical_expert import SpaceMedicalExpertSystem  # Ensure this import is correct
+    import sys
+
+    print("🧠 [DIAGNOSIS STARTED]", file=sys.stderr, flush=True)
+    print(f"📅 Mission day: {mission_day}", file=sys.stderr, flush=True)
+    print(f"🌀 Centrifugal habitat: {centrifugal_habitat}", file=sys.stderr, flush=True)
+    print(f"🧾 Symptoms: {symptoms}", file=sys.stderr, flush=True)
+
+    expert = SpaceMedicalExpertSystem()
+    expert.reset()
+
+    # Determine mission phase
+    if mission_day < 15:
+        phase = 'early'
+    elif mission_day < 90:
+        phase = 'mid'
+    else:
+        phase = 'late'
+
+    print(f"🕒 Declaring mission phase: {phase}", file=sys.stderr, flush=True)
+    expert.declare(Fact(mission_phase=phase))
+
+    # Declare symptoms
+    for entry in symptoms:
+        print(f"➕ Declaring symptom: {entry['symptom']}, severity: {entry['severity']}", file=sys.stderr, flush=True)
+        expert.declare(Fact(symptom=entry['symptom'], severity=entry['severity']))
+
+    # Optional: centrifugal environment
+    if centrifugal_habitat:
+        print("🌪️ Declaring centrifugal_habitat=True", file=sys.stderr, flush=True)
+        expert.declare(Fact(centrifugal_habitat=True))
+
+    expert.run()
+
+    results = expert.get_results().split('\n')
+    print("✅ Diagnosis complete. Recommendations:", file=sys.stderr, flush=True)
+    for r in results:
+        print("   •", r, file=sys.stderr, flush=True)
+
+    return results
+
+
 
 
 
@@ -478,5 +553,7 @@ tools = {
     "insert_beverage_rating": insert_beverage_rating,
     "insert_meal_schedule": insert_meal_schedule,
     "search_facts": tavily_search,
-    "insert_food_ratings": insert_food_ratings
+    "insert_food_ratings": insert_food_ratings,
+    "start_medical_interview": start_medical_interview,
+    "run_medical_diagnosis": run_medical_diagnosis
 }

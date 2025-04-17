@@ -65,12 +65,43 @@ SYSTEM_PROMPT = """
 
     search_facts: Search for external facts using Tavily (e.g. food nutrition data)
 
-    insert_food_ratings (to be used like): 
+    insert_food_ratings: Used as follows:
         insert_food_ratings([
             {"crew_name": "Alexis Lewis", "food_name": "Chicken Biryani", "rating": 5},
             {"crew_name": "Richard Pears", "food_name": "Chicken Biryani", "rating": 4},
             {"crew_name": "Harshita Anantula", "food_name": "Chicken Biryani", "rating": 3}
             ])
+    TOOL NAMES continued:
+    run_medical_diagnosis: Diagnose crew member symptoms using mission time and symptom severities.
+
+    Use this tool to generate personalized medical recommendations during the mission. You must first:
+    - Ask the user to list symptoms from the allowed list (below).
+    - Ask the user to specify a mission day (as an integer).
+    - Ask for severity of each symptom as one of: "mild", "moderate", "severe".
+
+    Only call `run_medical_diagnosis` once you have all of that information. If some data is missing, conduct a follow-up conversation until the full symptom+severity list and mission day are known.
+
+    run_medical_diagnosis(symptoms: list, mission_day: int, centrifugal_habitat: bool = False):
+        - Conduct a medical diagnosis using the expert system.
+        - You must ask the user for:
+            1. A list of symptoms from the set:
+            ['muscle_pain', 'vision_issue', 'stress', 'back_pain', 'insomnia', 'headache', 'dizziness', 'appetite_loss', 'motion_sickness']
+            2. The severity of each symptom (mild, moderate, severe)
+            3. The current mission day
+            4. Whether the user is in a centrifugal habitat
+    
+    ONLY SUBMIT ONE SEVERITY PER SYMPTOM MENTIONED.
+
+    Example tool call:
+    tool:run_medical_diagnosis({
+        "symptoms": [
+            {"symptom": "motion_sickness", "severity": "moderate"},
+            {"symptom": "muscle_pain", "severity": "mild"}
+        ],
+        "mission_day": 183,
+        "centrifugal_habitat": true
+    })
+
             
 
     Use these tools to populate and manage life support logistics, perform calculations, fetch tables, or search for needed facts. Always ensure outputs match mission constraints.
@@ -174,15 +205,32 @@ SYSTEM_PROMPT = """
     If the user asks for a tool that doesn't exist, say "I'm sorry, Dave, I'm afraid I can't do that."
 
     To search the internet, use tavily search tool.
+
+    Remember, NEVER use a scrubber AND a recycler (water recycler is fine and different than reycler); they are mutually exclusive.
     """
 # Global memory dictionary (very basic short-term memory)
-memory = {
+'''memory = {
     "last_tool": None,
     "last_tool_args": None,
     "last_tool_result": None,
     "last_code_result": None,  # NEW
     "last_nutrition_query": None
-}
+}'''
+
+import json
+
+def save_memory(memory, path="memory_store.json"):
+    with open(path, "w") as f:
+        json.dump(memory, f)
+
+def load_memory(path="memory_store.json"):
+    try:
+        with open(path, "r") as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {}
+
+memory = load_memory()
 
 
 def get_last_code_result():
@@ -191,19 +239,19 @@ def get_last_code_result():
 def run_agent(user_message: str):
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 
-    if memory["last_code_result"]:
+    if memory.get("last_code_result"):
         messages.append({
             "role": "assistant",
             "content": f"(Memory) Last code result stored in `result`:\n{memory['last_code_result']}"
         })
 
-    if memory["last_tool"]:
+    if memory.get("last_tool"):
         messages.append({
             "role": "assistant",
             "content": f"(Memory) Last tool used: `{memory['last_tool']}` with arguments {memory['last_tool_args']}.\nResult: {memory['last_tool_result']}"
         })
 
-    if memory["last_nutrition_query"]:
+    if memory.get("last_nutrition_query"):
         messages.append({
             "role": "assistant",
             "content": f"(Memory) Last nutrition query was for '{memory['last_nutrition_query']['item']}':\n{memory['last_nutrition_query']['result']}"

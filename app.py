@@ -17,6 +17,8 @@ from dotenv import load_dotenv
 import os
 from openai import OpenAI
 from agent_core import run_agent
+from medical_expert import SpaceMedicalExpertSystem
+from experta import Fact
 
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -44,15 +46,61 @@ def chat_page():
 
 @app.route('/chat_api', methods=['POST'])
 def chat_api():
-    user_msg = request.json.get('message', '').strip()
-    if not user_msg:
-        return jsonify({'reply': "⚠️ No message received."}), 400
+    from agent_core import run_agent
+    data = request.get_json()
+    user_message = data.get("message", "")
 
     try:
-        reply = run_agent(user_msg)
-        return jsonify({'reply': reply})
+        result = run_agent(user_message)
+        return jsonify({"reply": result})
     except Exception as e:
-        return jsonify({'reply': f"💥 Error: {str(e)}"}), 500
+        return jsonify({"reply": f"💥 Error: {str(e)}"})
+
+@app.route('/medical_assistant', methods=['GET'])
+def medical_assistant_page():
+    symptoms = [
+        'muscle_pain', 'vision_issue', 'stress', 'back_pain',
+        'insomnia', 'headache', 'dizziness', 'appetite_loss', 'motion_sickness'
+    ]
+    severities = ['mild', 'moderate', 'severe']
+    mission_phases = [
+        {'value': 'early', 'label': 'Early (Days 0–14)'},
+        {'value': 'mid', 'label': 'Mid (Days 15–89)'},
+        {'value': 'late', 'label': 'Late (Day 90+)'}
+    ]
+    return render_template('medical_assistant.html', symptoms=symptoms, severities=severities, mission_phases=mission_phases)
+
+@app.route("/clear_memory", methods=["POST"])
+def clear_memory():
+    from agent_core import save_memory
+    save_memory({
+        "last_tool": None,
+        "last_tool_args": None,
+        "last_tool_result": None,
+        "last_code_result": None,
+        "last_nutrition_query": None
+    })
+    return "✅ Memory cleared", 200
+
+@app.route('/medical_diagnosis', methods=['POST'])
+def medical_diagnosis_api():
+    data = request.get_json()
+    engine = SpaceMedicalExpertSystem()
+    engine.reset()
+
+    for entry in data.get('symptoms', []):
+        engine.declare(Fact(symptom=entry['symptom'], severity=entry['severity']))
+
+    if 'mission_phase' in data:
+        engine.declare(Fact(mission_phase=data['mission_phase']))
+
+    # If JS sends `true` as a literal boolean, this is fine:
+    if data.get("centrifugal_habitat") is True:
+        engine.declare(Fact(centrifugal_habitat=True))
+
+
+    engine.run()
+    return jsonify({'recommendations': engine.get_results().split('\n')})
 
 
 @app.route('/clear_all_databases', methods=['POST'])
