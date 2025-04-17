@@ -2,7 +2,7 @@
 from flask import Flask, render_template, request, redirect, url_for
 from engine import LifeSupportEngine, LifeSupportFacts
 from db_utils import init_db, insert_or_update, fetch_all_records
-from planner_fuck import MealPlanner
+from planner import MealPlanner
 from db_utils import get_latest_remaining_mass_budget
 from db_utils import fetch_all_records, get_all_nutrition_data  # assume these already exist
 import sqlite3
