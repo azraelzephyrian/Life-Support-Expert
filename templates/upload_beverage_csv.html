@@ -153,7 +153,7 @@
             position: fixed;
             bottom: 80px;
             right: 40px;
-            width: 400px;
+            width: 500px;
             max-height: 80vh;
             overflow: hidden;
             z-index: 1000;
@@ -162,6 +162,7 @@
             box-shadow: 0 0 15px rgba(255,255,255,0.3);
             backdrop-filter: blur(4px);
             overflow-y: auto;
+            padding-bottom: 12px;
         }
 
         .chat-box {
@@ -186,6 +187,84 @@
         @keyframes fadeIn {
             from { opacity: 0; transform: translateY(4px); }
             to { opacity: 1; transform: translateY(0); }
+        }
+
+        .message.user, .message.bot {
+            display: flex;
+            align-items: flex-start;
+            margin-bottom: 16px;
+            max-width: 95%;
+            word-wrap: break-word;
+            animation: fadeIn 0.4s ease-in;
+        }
+
+        .message.user {
+            justify-content: flex-end;
+            text-align: right;
+        }
+
+        .message.bot {
+            justify-content: flex-start;
+            text-align: left;
+        }
+
+        .bubble {
+            padding: 12px 16px;
+            border-radius: 16px;
+            font-family: 'Inter', sans-serif;
+            font-size: 15px;
+            line-height: 1.4;
+            max-width: 80%;
+            box-shadow: 0 0 12px rgba(0,0,0,0.1);
+        }
+
+        .user .bubble {
+            background: linear-gradient(to bottom right, #262262, #4f4498);
+            color: white;
+            border-bottom-right-radius: 0;
+        }
+
+        .bot .bubble {
+            background: rgba(255, 255, 255, 0.08);
+            backdrop-filter: blur(8px);
+            color: #eee;
+            border-bottom-left-radius: 0;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .avatar {
+            width: 36px;
+            height: 36px;
+            margin: 4px 10px;
+            font-size: 24px;
+        }
+
+        .tool-response {
+            background: rgba(0, 0, 0, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            margin-top: 10px;
+            padding: 10px 14px;
+            font-family: monospace;
+            color: #0f0;
+            font-size: 14px;
+            white-space: pre-wrap;
+            box-shadow: inset 0 0 6px rgba(0,255,0,0.1);
+        }
+
+        pre code {
+            display: block;
+            background-color: #111;
+            color: #00ff9c;
+            padding: 12px;
+            border-radius: 10px;
+            font-family: "Courier New", monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            margin-top: 10px;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            box-shadow: inset 0 0 6px rgba(255,255,255,0.1);
         }
 
     </style>
@@ -220,6 +299,7 @@
         </select>
     </div>
     <!-- Toggle Button -->
+    <!-- HAL Toggle -->
     <div style="position: fixed; top: 20px; left: 40px; z-index: 20;">
         <button 
             onclick="toggleHALChat()" 
@@ -260,6 +340,7 @@
             <button onclick="clearChat()" style="background-color: crimson;">🧼 Clear Chat</button>
         </div>
     </div>
+
 
     
     <div style="
@@ -329,23 +410,28 @@
         const chatBox = document.getElementById("hal-chat-container");
         chatBox.style.display = chatBox.style.display === "none" ? "block" : "none";
     }
-    
+
     function clearChat() {
         localStorage.removeItem("hal_chat_history");
         localStorage.removeItem("hal_last_input");
         document.getElementById("messages").innerHTML = "";
         document.getElementById("userInput").value = "";
+
+        // Clear backend memory
+        fetch("/clear_memory", { method: "POST" })
+            .then(res => console.log("✅ Memory reset"))
+            .catch(err => console.error("❌ Failed to reset memory:", err));
     }
-    
+
     function speakText(text) {
         if (!document.getElementById("voiceToggle").checked) return;
-    
+
         const utterance = new SpeechSynthesisUtterance(text);
         utterance.lang = "en-US";
         utterance.pitch = 0.8;
         utterance.rate = 0.85;
         utterance.volume = 0.9;
-    
+
         const voices = window.speechSynthesis.getVoices();
         const halVoice = voices.find(v =>
             v.name.includes("Daniel") ||
@@ -354,46 +440,94 @@
             v.name.includes("English")
         );
         if (halVoice) utterance.voice = halVoice;
-    
+
         window.speechSynthesis.cancel();
         window.speechSynthesis.speak(utterance);
     }
-    
+
     function handleKey(event) {
         if (event.key === "Enter") {
             event.preventDefault();
             sendMessage();
         }
     }
-    
+
+    document.addEventListener("DOMContentLoaded", () => {
+        const savedHistory = localStorage.getItem("hal_chat_history");
+        if (savedHistory) {
+            document.getElementById("messages").innerHTML = savedHistory;
+        }
+
+        const lastInput = localStorage.getItem("hal_last_input");
+        if (lastInput) {
+            document.getElementById("userInput").value = lastInput;
+        }
+
+        document.getElementById("userInput").addEventListener("input", () => {
+            localStorage.setItem("hal_last_input", document.getElementById("userInput").value);
+        });
+    });
+
     async function sendMessage() {
         const input = document.getElementById("userInput");
         const text = input.value.trim();
         if (!text) return;
-    
+
         const msgBox = document.getElementById("messages");
-        msgBox.innerHTML += `<div class="user">👩‍🚀 ${text}</div>`;
+        msgBox.innerHTML += `
+            <div class="message user">
+                <div class="avatar">👩‍🚀</div>
+                <div class="bubble">${text}</div>
+            </div>`;
+
         input.value = "";
-    
+
         const previewId = `preview-${Date.now()}`;
-        let previewHTML = `<div class="bot" id="${previewId}">🔴 <em>executing...</em></div>`;
-        msgBox.innerHTML += previewHTML;
-    
+        msgBox.innerHTML += `
+            <div class="message bot" id="${previewId}">
+                <div class="avatar">🔴 </div>
+                <div class="bubble"><em>🔴 Executing...</em></div>
+            </div>`;
+
         try {
             const response = await fetch("/chat_api", {
                 method: "POST",
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: text })
             });
-    
+
             const data = await response.json();
             const botReply = data.reply || "⚠️ No reply";
             const container = document.getElementById(previewId);
-    
+
             const jsonMatch = botReply.match(/__table__([\s\S]+?)__end__/);
-            const codeResult = botReply.replace(/```(?:python)?[\s\S]+?```/, '').trim();
-    
-            let finalRender = `<div class="bot">🔴 ${codeResult}</div>`;
+            const codeMatch = botReply.match(/```(?:[\w]+)?\s*([\s\S]*?)```/);
+            const toolHeaderMatch = botReply.match(/__tool__([\s\S]+?)__endtool__/);
+
+            let textOnly = botReply
+                .replace(/```(?:[\w]+)?[\s\S]*?```/, '')
+                .replace(/__table__[\s\S]+?__end__/, '')
+                .replace(/__tool__[\s\S]+?__endtool__/, '')
+                .trim()
+                .replace(/\n/g, "<br>");
+
+            let finalRender = `
+                <div class="message bot">
+                    <div class="avatar">🔴 </div>
+                    <div class="bubble">
+                        ${textOnly}`;
+
+            if (toolHeaderMatch) {
+                finalRender += `
+                    <div class="tool-response">
+                        <strong>🛠 Tool Call</strong><br>${toolHeaderMatch[1].trim()}
+                    </div>`;
+            }
+
+            if (codeMatch) {
+                finalRender += `<pre><code>${codeMatch[1].trim()}</code></pre>`;
+            }
+
             if (jsonMatch) {
                 try {
                     const json = JSON.parse(jsonMatch[1].trim());
@@ -402,24 +536,29 @@
                     finalRender += `<div style="color: red;">⚠️ Failed to parse table JSON.</div>`;
                 }
             }
-    
+
+            finalRender += `</div></div>`;
             container.outerHTML = finalRender;
             speakText(botReply);
         } catch (err) {
             const container = document.getElementById(previewId);
-            container.outerHTML = `<div class="bot">💥 Error: ${err.message}</div>`;
+            container.outerHTML = `
+                <div class="message bot">
+                    <div class="avatar">🔴 </div>
+                    <div class="bubble">💥 Error: ${err.message}</div>
+                </div>`;
         }
-    
+
         msgBox.scrollTop = msgBox.scrollHeight;
         localStorage.setItem("hal_chat_history", msgBox.innerHTML);
         localStorage.setItem("hal_last_input", "");
     }
-    
+
     function renderTableFromJSON(obj) {
         if (!Array.isArray(obj) || obj.length === 0) return `<div>No data found.</div>`;
         const keys = Object.keys(obj[0]);
         const rows = obj.map(row => `<tr>${keys.map(k => `<td>${row[k]}</td>`).join('')}</tr>`).join('');
-    
+
         return `
             <table style="border-collapse: collapse; margin-top: 10px; background-color: #1b1b1b; color: #fff; border: 1px solid #666;">
                 <thead><tr>${keys.map(k => `<th style="padding: 4px 8px; border: 1px solid #666;">${k}</th>`).join('')}</tr></thead>
@@ -427,6 +566,7 @@
             </table>
         `;
     }
+
     </script>
     
 </html>

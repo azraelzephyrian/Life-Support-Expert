@@ -82,7 +82,58 @@ def get_latest_remaining_mass_budget(gas_db_path='gas_budget.db'):
     raise ValueError("⚠️ No gas budget record found.")
 
 
+def get_latest_remaining_mass_budget(gas_db_path='gas_budget.db'):
+    conn = sqlite3.connect(gas_db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT base_weight_limit, total_gas_mass
+        FROM gas_masses
+        ORDER BY timestamp DESC
+        LIMIT 1
+    """)
+    row = cursor.fetchone()
+    conn.close()
 
+    if row:
+        base_weight_limit, gas_mass = row
+        if base_weight_limit is None:
+            raise ValueError("⚠️ base_weight_limit is NULL in the latest gas budget entry.")
+        if gas_mass is None:
+            raise ValueError("⚠️ total_gas_mass is NULL in the latest gas budget entry.")
+        return round(base_weight_limit - gas_mass, 2)
+
+    raise ValueError("⚠️ No gas budget record found.")
+
+def get_latest_true_mass_budget(gas_db_path='gas_budget.db'):
+    import sqlite3
+
+    conn = sqlite3.connect(gas_db_path)
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT base_weight_limit, total_gas_mass, cumulative_meal_mass
+        FROM gas_masses
+        ORDER BY timestamp DESC
+        LIMIT 1
+    """)
+    row = cursor.fetchone()
+    conn.close()
+
+    if row:
+        base_weight_limit, total_gas_mass, cumulative_meal_mass = row
+
+        if base_weight_limit is None:
+            raise ValueError("⚠️ base_weight_limit is NULL in the latest gas budget entry.")
+        if total_gas_mass is None:
+            raise ValueError("⚠️ total_gas_mass is NULL in the latest gas budget entry.")
+        if cumulative_meal_mass is None:
+            raise ValueError("⚠️ cumulative_meal_mass is NULL in the latest gas budget entry.")
+
+        total_mass = total_gas_mass + cumulative_meal_mass
+        remaining_budget = round(base_weight_limit - total_mass, 2)
+
+        return remaining_budget
+
+    raise ValueError("⚠️ No gas budget record found.")
 
 
 def get_all_nutrition_data(food_path='nutrition.db', beverage_path='beverage.db'):

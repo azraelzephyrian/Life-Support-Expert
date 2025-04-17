@@ -9,7 +9,7 @@ from db_utils import (
     get_latest_gas_budget_record,
     get_cumulative_meal_mass,
     insert_gas_budget,
-    get_latest_remaining_mass_budget
+    get_latest_true_mass_budget
 )
 import re
 from tavily_search import tavily_search
@@ -28,23 +28,79 @@ def add_beverage_item(bev: dict):
     insert_or_update("beverage.db", "beverages", bev, "name")
     return f"Beverage '{bev['name']}' added."
 
+import json
+
 def get_crew_table():
-    return fetch_all_records("astronauts.db", "crew").to_dict(orient="records")
+    result = fetch_all_records("astronauts.db", "crew").to_dict(orient="records")
+    return f"""__tool__
+Tool: get_crew_table executed
+__endtool__
+
+__table__
+{json.dumps(result)}
+__end__"""
+
+
+
+
 
 def get_food_table():
-    return fetch_all_records("nutrition.db", "foods").to_dict(orient="records")
+    result = fetch_all_records("nutrition.db", "foods").to_dict(orient="records")
+    return f"""__tool__
+Tool: get_food_table executed
+__endtool__
+
+__table__
+{json.dumps(result)}
+__end__"""
+
 
 def get_beverage_table():
-    return fetch_all_records("beverage.db", "beverages").to_dict(orient="records")
+    result = fetch_all_records("beverage.db", "beverages").to_dict(orient="records")
+    return f"""__tool__
+Tool: get_beverage_table executed
+__endtool__
+
+__table__
+{json.dumps(result)}
+__end__"""
+
+
 
 def get_gas_budget():
-    return get_latest_gas_budget_record()
+    result = get_latest_gas_budget_record()
+    return f"""__tool__
+Tool: get_gas_budget executed
+__endtool__
+
+__table__
+{json.dumps([result])}
+__end__"""
+
+
 
 def get_meal_mass():
-    return get_cumulative_meal_mass()
+    result = get_cumulative_meal_mass()
+    return f"""__tool__
+Tool: get_meal_mass executed
+__endtool__
+
+__table__
+{json.dumps([{"cumulative_meal_mass": result}])}
+__end__"""
+
+
 
 def get_remaining_mass_budget():
-    return get_latest_remaining_mass_budget()
+    result = get_latest_true_mass_budget()
+    return f"""__tool__
+Tool: get_remaining_mass_budget executed
+__endtool__
+
+__table__
+{json.dumps([{"remaining_mass_budget": result}])}
+__end__"""
+
 
 def trigger_rationing():
     try:
@@ -379,15 +435,22 @@ def generate_gas_budget(
         'base_weight_limit': weight_limit + get_cumulative_meal_mass()
     })
 
-    return {
-        "status": "✅ Gas budget generated and stored.",
-        "live_over_limit": results['live_over_limit'],
-        "summary": {
-            "gas_mass": results['total_life_support_mass'],
-            "combined_mass": results['combined_life_support_mass'],
-            "within_limit": results['live_over_limit']
-        }
+    summary = {
+        "gas_mass": results['total_life_support_mass'],
+        "combined_mass": results['combined_life_support_mass'],
+        "within_limit": results['live_over_limit']
     }
+    return f"""__tool__
+    Tool: generate_gas_budget executed
+    __endtool__
+
+    ✅ Gas budget generated and stored.
+
+    __table__
+    {json.dumps([summary])}
+    __end__"""
+
+
 
 
 import sqlite3
