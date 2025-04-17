@@ -582,13 +582,34 @@ def run_medical_diagnosis(symptoms: list, mission_day: int, centrifugal_habitat:
         expert.declare(Fact(centrifugal_habitat=True))
 
     expert.run()
-
     results = expert.get_results().split('\n')
-    print("✅ Diagnosis complete. Recommendations:", file=sys.stderr, flush=True)
-    for r in results:
-        print("   •", r, file=sys.stderr, flush=True)
 
-    return results
+    structured = []
+    for r in results:
+        if 'vestibular' in r.lower() or 'coriolis' in r.lower():
+            category = 'Vestibular'
+        elif 'immune' in r.lower() or 'bone' in r.lower():
+            category = 'Systemic'
+        else:
+            category = 'General'
+
+        severity = 'Moderate' if 'moderate' in r.lower() else 'Mild'
+        structured.append({
+            "category": category,
+            "severity": severity,
+            "recommendation": r
+        })
+
+    return f"""__tool__
+Tool: run_medical_diagnosis executed
+__endtool__
+
+✅ Medical diagnosis complete. {len(structured)} recommendation(s) returned.
+
+__table__
+{json.dumps(structured, ensure_ascii=False)}
+__end__"""
+
 
 
 

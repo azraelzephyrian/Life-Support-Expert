@@ -40,25 +40,27 @@
             }
     
         .chat-box {
-            display: flex;
-            flex-direction: column;
-            height: 85vh; /* ⬅️ Most of the page height */
-            max-width: 1000px;
-            margin: 0 auto;
-            background-color: rgba(0, 0, 0, 0.7);
+            background-color: #0a0a0a; /* Solid black */
             border-radius: 16px;
             box-shadow: 0 0 12px rgba(255,255,255,0.1);
             padding: 16px;
+            display: flex;
+            flex-direction: column;
+            height: 85vh;
+            max-width: 1000px;
+            margin: 0 auto;
             overflow: hidden;
+            box-shadow: 0 0 20px rgba(255, 0, 0, 0.1), 0 0 12px rgba(255,255,255,0.15);
         }
 
         .messages {
-            flex: 1 1 auto;
-            overflow-y: auto;
+            background-color: #1a1a1a; /* Dark solid for scroll area */
+            border-radius: 10px;
             padding: 16px;
-            margin-bottom: 12px;
-            border-radius: 8px;
+            overflow-y: auto;
+            flex: 1;
         }
+
 
         .message-input {
             display: flex;
@@ -367,9 +369,29 @@
                 const botReply = data.reply || "⚠️ No reply";
                 const container = document.getElementById(previewId);
 
+                let content = botReply;
+                let tableHTML = "";
+
+                // Extract and render __table__ block
+                const tableMatch = botReply.match(/__table__([\s\S]*?)__end__/);
+                if (tableMatch) {
+                    try {
+                        const parsed = JSON.parse(tableMatch[1].trim());
+                        tableHTML = renderTableFromJSON(parsed);
+                        content = botReply.replace(/__table__[\s\S]*?__end__/, tableHTML);
+                    } catch (e) {
+                        console.error("⚠️ Failed to parse tool table JSON:", e);
+                    }
+                }
+
+                // Optional cleanup: remove __tool__ blocks too
+                content = content
+                    .replace(/__tool__[\s\S]*?__endtool__/, "")
+                    .replace(/\n/g, "<br>");
+
                 container.innerHTML = `
                     <div class="avatar">🔴</div>
-                    <div class="bubble">${botReply.replace(/\n/g, "<br>")}</div>`;
+                    <div class="bubble">${content}</div>`;
 
                 speakText(botReply);
             } catch (err) {
@@ -402,6 +424,18 @@
                 alert("Voice input error: " + event.error);
             };
         }
+        function renderTableFromJSON(obj) {
+        if (!Array.isArray(obj) || obj.length === 0) return `<div>No data found.</div>`;
+        const keys = Object.keys(obj[0]);
+        const rows = obj.map(row => `<tr>${keys.map(k => `<td>${row[k]}</td>`).join('')}</tr>`).join('');
+
+        return `
+            <table style="border-collapse: collapse; margin-top: 10px; background-color: #1b1b1b; color: #fff; border: 1px solid #666;">
+                <thead><tr>${keys.map(k => `<th style="padding: 4px 8px; border: 1px solid #666;">${k}</th>`).join('')}</tr></thead>
+                <tbody>${rows}</tbody>
+            </table>
+        `;
+    }
 
     </script>
     

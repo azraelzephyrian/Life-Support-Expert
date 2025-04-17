@@ -648,23 +648,27 @@
             const botReply = data.reply || "⚠️ No reply";
             const container = document.getElementById(previewId);
 
+            // Extract tool info
             const jsonMatch = botReply.match(/__table__([\s\S]+?)__end__/);
             const codeMatch = botReply.match(/```(?:[\w]+)?\s*([\s\S]*?)```/);
             const toolHeaderMatch = botReply.match(/__tool__([\s\S]+?)__endtool__/);
 
+            // Clean text content
             let textOnly = botReply
-                .replace(/```(?:[\w]+)?[\s\S]*?```/, '')
-                .replace(/__table__[\s\S]+?__end__/, '')
-                .replace(/__tool__[\s\S]+?__endtool__/, '')
+                .replace(/```(?:[\w]+)?[\s\S]*?```/, '')           // remove code block
+                .replace(/__table__[\s\S]+?__end__/, '')           // remove table
+                .replace(/__tool__[\s\S]+?__endtool__/, '')        // remove tool header
                 .trim()
-                .replace(/\n/g, "<br>");
+                .replace(/\n/g, "<br>");                           // format line breaks
 
+            // Start rendering the message bubble
             let finalRender = `
                 <div class="message bot">
                     <div class="avatar">🔴 </div>
                     <div class="bubble">
                         ${textOnly}`;
 
+            // Tool call (if any)
             if (toolHeaderMatch) {
                 finalRender += `
                     <div class="tool-response">
@@ -672,10 +676,12 @@
                     </div>`;
             }
 
+            // Code block (if any)
             if (codeMatch) {
                 finalRender += `<pre><code>${codeMatch[1].trim()}</code></pre>`;
             }
 
+            // JSON table (if any)
             if (jsonMatch) {
                 try {
                     const json = JSON.parse(jsonMatch[1].trim());

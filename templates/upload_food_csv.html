@@ -467,12 +467,11 @@
         input.value = "";
 
         const previewId = `preview-${Date.now()}`;
-        let previewHTML = `
+        msgBox.innerHTML += `
             <div class="message bot" id="${previewId}">
                 <div class="avatar">🔴 </div>
                 <div class="bubble"><em>🔴 Executing...</em></div>
             </div>`;
-        msgBox.innerHTML += previewHTML;
 
         try {
             const response = await fetch("/chat_api", {
@@ -485,24 +484,27 @@
             const botReply = data.reply || "⚠️ No reply";
             const container = document.getElementById(previewId);
 
+            // Extract tool info
             const jsonMatch = botReply.match(/__table__([\s\S]+?)__end__/);
             const codeMatch = botReply.match(/```(?:[\w]+)?\s*([\s\S]*?)```/);
             const toolHeaderMatch = botReply.match(/__tool__([\s\S]+?)__endtool__/);
 
+            // Clean text content
             let textOnly = botReply
-                .replace(/```(?:[\w]+)?[\s\S]*?```/, '') // remove code block
-                .replace(/__table__[\s\S]+?__end__/, '') // remove JSON block
-                .replace(/__tool__[\s\S]+?__endtool__/, '') // remove tool block
+                .replace(/```(?:[\w]+)?[\s\S]*?```/, '')           // remove code block
+                .replace(/__table__[\s\S]+?__end__/, '')           // remove table
+                .replace(/__tool__[\s\S]+?__endtool__/, '')        // remove tool header
                 .trim()
-                .replace(/\n/g, "<br>"); // newlines
+                .replace(/\n/g, "<br>");                           // format line breaks
 
+            // Start rendering the message bubble
             let finalRender = `
                 <div class="message bot">
                     <div class="avatar">🔴 </div>
                     <div class="bubble">
                         ${textOnly}`;
 
-            // 🔧 Insert Tool Header
+            // Tool call (if any)
             if (toolHeaderMatch) {
                 finalRender += `
                     <div class="tool-response">
@@ -510,13 +512,12 @@
                     </div>`;
             }
 
-            // 🔧 Insert Code Block
+            // Code block (if any)
             if (codeMatch) {
-                finalRender += `
-                    <pre><code>${codeMatch[1].trim()}</code></pre>`;
+                finalRender += `<pre><code>${codeMatch[1].trim()}</code></pre>`;
             }
 
-            // 🔧 Insert Table if Detected
+            // JSON table (if any)
             if (jsonMatch) {
                 try {
                     const json = JSON.parse(jsonMatch[1].trim());
@@ -526,8 +527,7 @@
                 }
             }
 
-            finalRender += `</div></div>`; // Close bubble + message
-
+            finalRender += `</div></div>`;
             container.outerHTML = finalRender;
             speakText(botReply);
         } catch (err) {
@@ -543,7 +543,6 @@
         localStorage.setItem("hal_chat_history", msgBox.innerHTML);
         localStorage.setItem("hal_last_input", "");
     }
-
 
     function renderTableFromJSON(obj) {
         if (!Array.isArray(obj) || obj.length === 0) return `<div>No data found.</div>`;
