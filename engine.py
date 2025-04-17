@@ -102,7 +102,7 @@ class LifeSupportEngine(KnowledgeEngine):
             recycler_mass = recycler_weight
 
         o2_from_tanks = max(total_o2_required - o2_reclaimed, 0)
-        tank_mass = o2_from_tanks * oxygen_tank_weight_per_kg
+        tank_mass = o2_from_tanks * (1 + oxygen_tank_weight_per_kg)
         total_mass = tank_mass + scrubber_mass + recycler_mass
 
         # === NITROGEN REQUIREMENT ===

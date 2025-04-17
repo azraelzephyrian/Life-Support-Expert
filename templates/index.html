@@ -447,14 +447,14 @@
                 <div class="error">{{ results.error }}</div>
             {% else %}
                 <h2>Life Support Summary</h2>
-                <p><strong>Total O₂ Required:</strong> {{ results.o2_required_kg }} kg</p>
+                <p><strong>Total O₂ Required (Before Recycling):</strong> {{ results.o2_required_kg }} kg</p>
                 <p><strong>O₂ Reclaimed from CO₂:</strong> {{ results.o2_reclaimed }} kg</p>
                 <p><strong>CO₂ Generated:</strong> {{ results.co2_generated }} kg</p>
-                <p><strong>O₂ Tank Mass:</strong> {{ results.o2_tank_mass }} kg</p>
+                <p><strong>Combined O₂ and Tank Mass:</strong> {{ results.o2_tank_mass }} kg</p>
                 <p><strong>Scrubber Mass:</strong> {{ results.scrubber_mass }} kg</p>
                 <p><strong>Sabatier Recycler Mass:</strong> {{ results.recycler_mass }} kg</p>
                 <p><strong>Total N₂ Required:</strong> {{ results.n2_required_kg }} kg</p>
-                <p><strong>N₂ Tank Mass:</strong> {{ results.n2_tank_mass }} kg</p>
+                <p><strong>N₂ and Tank Mass:</strong> {{ results.n2_tank_mass }} kg</p>
                 <p><strong>Water (Hygiene Use Only):</strong> {{ results.water_hygiene_raw }} g</p>
                 <p><strong>Water (Excreted from Meals):</strong> {{ results.water_excretion }} g</p>
                 <p><strong>Water Recovered:</strong> {{ results.water_recovered }} g</p>
@@ -656,7 +656,7 @@
     <button type="submit">Edit Food Database →</button>
 </form>
 <form action="/meal_log" method="GET">
-    <button>📅 View Meal Log from Database</button>
+    <button>📅 View Meal</button>
 </form>
 <link rel="stylesheet" href="{{ url_for('static', filename='css/base.css') }}">
 </html>
