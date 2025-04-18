@@ -277,17 +277,86 @@
                 <input type="checkbox" id="voiceToggle" />
                 🔊 Narrate AI Replies
             </label>
+            <label style="color: white; font-size: 14px;">
+                <input type="checkbox" id="multiTurnToggle" />
+                🔁 Multi-Turn Mode
+            </label>   
             <button onclick="startVoiceInput()">🎙️ Speak</button>
             <button onclick="clearChat()" style="background-color: crimson;">🧼 Clear Chat</button>
         </div>
     </div>
-    
-
-    <div style="text-align: center; margin-top: 10px;">
-        <button onclick="clearChat()" style="background-color: crimson;">🧼 Clear Chat</button>
-    </div>
 
     <script>
+        function renderMultiTurnToolOutput(rawText) {
+            const matchToolCall = rawText.match(/tool:(\w+)\(\s*([\s\S]*?)\s*\)/);
+            const matchTable = rawText.match(/__table__\s*([\s\S]+?)\s*__end__/);
+            let result = "";
+
+            // 🛠️ Tool Call Table
+            if (matchToolCall) {
+                const toolName = matchToolCall[1];
+                let argsRaw = matchToolCall[2].trim();
+
+                try {
+                    // ✅ Clean up and sanitize for JSON parsing
+                    let jsonStr = argsRaw
+                        .replace(/(['"])?([a-zA-Z0-9_]+)(['"])?\s*:/g, '"$2":') // ensure keys quoted
+                        .replace(/'/g, '"') // normalize quotes
+                        .replace(/\bTrue\b/g, 'true')
+                        .replace(/\bFalse\b/g, 'false')
+                        .replace(/\bNone\b/g, 'null')
+                        .replace(/,\s*([}\]])/g, '$1'); // remove trailing commas
+
+                    if (!jsonStr.trim().startsWith("{") || !jsonStr.trim().endsWith("}")) {
+                        throw new Error("Tool arguments must be a valid object literal.");
+                    }
+
+                    const parsedArgs = JSON.parse(jsonStr);
+
+                    const argRows = Object.entries(parsedArgs).map(
+                        ([key, val]) => `<tr><td style="padding: 6px 12px; border: 1px solid #444;"><code>${key}</code></td>
+                                            <td style="padding: 6px 12px; border: 1px solid #444;">${String(val)}</td></tr>`
+                    ).join("");
+
+                    result += `
+                        <div style="margin-top: 14px;">
+                            <strong>⚙️ Tool Call: <code>${toolName}</code></strong>
+                            <table style="width: 100%; margin-top: 8px; border-collapse: collapse; background: rgba(255,255,255,0.04); font-size: 14px;">
+                                <thead>
+                                    <tr style="border-bottom: 2px solid #666;">
+                                        <th style="padding: 8px 12px; text-align: left;">Argument</th>
+                                        <th style="padding: 8px 12px; text-align: left;">Value</th>
+                                    </tr>
+                                </thead>
+                                <tbody>${argRows}</tbody>
+                            </table>
+                        </div>`;
+                } catch (e) {
+                    result += `<p style="color: red;">⚠️ Failed to parse tool call arguments: ${e.message}</p>`;
+                }
+            }
+
+            // 📊 Final Output Table
+            if (matchTable) {
+                try {
+                    const cleanTable = matchTable[1]
+                        .replace(/\\n/g, '')
+                        .replace(/\\"/g, '"')
+                        .replace(/\\'/g, "'");
+
+                    const parsedTable = JSON.parse(cleanTable);
+                    result += "<div style='margin-top: 20px;'>" + renderTableFromJSON(parsedTable) + "</div>";
+                } catch (e) {
+                    result += `<p style="color: red;">⚠️ Failed to parse final table output: ${e.message}</p>`;
+                }
+            }
+
+            return result || rawText;
+        }
+
+
+
+
         function clearChat() {
             localStorage.removeItem("hal_chat_history");
             localStorage.removeItem("hal_last_input");
@@ -358,15 +427,30 @@
                     <div class="bubble"><em>Executing...</em></div>
                 </div>`;
 
+            const isMultiTurn = document.getElementById("multiTurnToggle")?.checked || false;
+
             try {
                 const response = await fetch("/chat_api", {
                     method: "POST",
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: text })
+                    body: JSON.stringify({
+                        message: text,
+                        multi_turn: isMultiTurn   // ✅ Send toggle state
+                    })
                 });
 
+
                 const data = await response.json();
-                const botReply = data.reply || "⚠️ No reply";
+                let botReply = data.reply || "⚠️ No reply";
+                if (typeof botReply !== "string") {
+                    botReply = JSON.stringify(botReply, null, 2);  // ✅ Ensures it's a string
+                }
+                if (botReply.includes("✅ Multi-Turn Execution Complete:") && botReply.includes("__table__")) {
+                    const formatted = renderMultiTurnToolOutput(botReply);
+                    botReply = formatted;
+                }
+
+
                 const container = document.getElementById(previewId);
 
                 let content = botReply;
@@ -384,7 +468,37 @@
                     }
                 }
 
-                // Optional cleanup: remove __tool__ blocks too
+                // 📋 Detect and format Multi-Turn JSON results
+                const multiTurnMatch = botReply.match(/✅ Multi-Turn Execution Complete:\s*<br><br>({[\s\S]*})<br><br>🎯 Final Output:/);
+                if (multiTurnMatch) {
+                    try {
+                        const parsed = JSON.parse(multiTurnMatch[1].replaceAll("<br>", "\n"));  // fix HTML newlines
+                        const stepRows = Object.entries(parsed).map(([step, output]) => `
+                            <tr>
+                                <td style="padding: 6px 12px; border-bottom: 1px solid #444;"><strong>Step ${step}</strong></td>
+                                <td style="padding: 6px 12px; border-bottom: 1px solid #444;">${output.replace(/\n/g, "<br>")}</td>
+                            </tr>`).join("");
+
+                        const multiTurnTable = `
+                            <div style="overflow-x: auto; margin-top: 12px;">
+                                <table style="width: 100%; background: rgba(255,255,255,0.04); border-collapse: collapse; font-size: 14px;">
+                                    <thead>
+                                        <tr>
+                                            <th style="padding: 8px 12px; border-bottom: 2px solid #666; text-align: left;">🧩 Step</th>
+                                            <th style="padding: 8px 12px; border-bottom: 2px solid #666; text-align: left;">🔍 Result</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>${stepRows}</tbody>
+                                </table>
+                            </div>`;
+
+                        content = content.replace(multiTurnMatch[0], multiTurnTable);
+                    } catch (e) {
+                        console.error("⚠️ Failed to render multi-turn table:", e);
+                    }
+                }
+
+                // Optional cleanup
                 content = content
                     .replace(/__tool__[\s\S]*?__endtool__/, "")
                     .replace(/\n/g, "<br>");
@@ -405,6 +519,7 @@
             localStorage.setItem("hal_chat_history", msgBox.innerHTML);
             localStorage.setItem("hal_last_input", "");
         }
+
 
         function startVoiceInput() {
             const input = document.getElementById("userInput");

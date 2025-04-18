@@ -47,14 +47,22 @@ def chat_page():
 @app.route('/chat_api', methods=['POST'])
 def chat_api():
     from agent_core import run_agent
+    from orchestrator import run_multi_turn_plan
     data = request.get_json()
     user_message = data.get("message", "")
+    run_plan = data.get("run_plan", False)
+    multi_turn = data.get("multi_turn", False)
 
     try:
-        result = run_agent(user_message)
+        if run_plan:
+            result = run_multi_turn_plan()
+        else:
+            result = run_agent(user_message, multi_turn=multi_turn)
+
         return jsonify({"reply": result})
     except Exception as e:
         return jsonify({"reply": f"💥 Error: {str(e)}"})
+
 
 @app.route('/medical_assistant', methods=['GET'])
 def medical_assistant_page():
