@@ -287,26 +287,6 @@
         }
 
     </style>
-
-    <script>
-        function toggleCO2Options() {
-            const scrubberBox = document.getElementById('use_scrubber');
-            const recyclerBox = document.getElementById('use_recycler');
-
-            if (scrubberBox.checked) recyclerBox.checked = false;
-            if (recyclerBox.checked) scrubberBox.checked = false;
-
-            document.getElementById('scrubber-fields').style.display = scrubberBox.checked ? 'block' : 'none';
-            document.getElementById('recycler-fields').style.display = recyclerBox.checked ? 'block' : 'none';
-        }
-
-        window.onload = function() {
-            const waterBox = document.getElementById('use_water_recycler');
-            waterBox.addEventListener('change', function() {
-                document.getElementById('water-recycler-fields').style.display = this.checked ? 'block' : 'none';
-            });
-        }
-    </script>
 </head>
 <body>
     <img id="cupola-frame" src="{{ url_for('static', filename='images/cupola-audio-terminal-unit.png') }}" alt="Cupola Frame Overlay">
@@ -436,12 +416,6 @@
         <label for="water_recycler_mass">Water Recycler Hardware Weight (kg):</label>
         <input type="number" name="water_recycler_weight" value = "450" step="0.01">
         </div>
-
-        <script>
-        document.getElementById('use_water_recycler').addEventListener('change', function() {
-            document.getElementById('water-recycler-fields').style.display = this.checked ? 'block' : 'none';
-        });
-        </script>
 
 
         <label for="weight_limit">Life Support Mass Budget (kg):</label>
@@ -578,6 +552,23 @@
     
     
     <script>
+        function toggleWaterRecyclerFields() {
+            const waterCheckbox = document.getElementById('use_water_recycler');
+            const waterFields = document.getElementById('water-recycler-fields');
+            if (waterCheckbox && waterFields) {
+                waterFields.style.display = waterCheckbox.checked ? 'block' : 'none';
+            }
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            const waterCheckbox = document.getElementById('use_water_recycler');
+            if (waterCheckbox) {
+                // Run once on load
+                toggleWaterRecyclerFields();
+                // Attach listener
+                waterCheckbox.addEventListener('change', toggleWaterRecyclerFields);
+            }
+        });
         function clearChat() {
             localStorage.removeItem("hal_chat_history");
             localStorage.removeItem("hal_last_input");
@@ -787,6 +778,37 @@
         `;
     }
 
+
+    window.onload = function () {
+        const waterBox = document.getElementById('use_water_recycler');
+        const scrubberBox = document.getElementById('use_scrubber');
+        const recyclerBox = document.getElementById('use_recycler');
+
+        // 🔧 Water recycler toggle
+        if (waterBox) {
+            waterBox.addEventListener('change', function () {
+                document.getElementById('water-recycler-fields').style.display = this.checked ? 'block' : 'none';
+            });
+
+            // ✅ Also set initial state
+            document.getElementById('water-recycler-fields').style.display = waterBox.checked ? 'block' : 'none';
+        }
+
+        // 🔧 CO₂ toggles
+        if (scrubberBox && recyclerBox) {
+            scrubberBox.addEventListener('change', toggleCO2Options);
+            recyclerBox.addEventListener('change', toggleCO2Options);
+            toggleCO2Options();
+        }
+    };
+
+    function toggleCO2Options() {
+        const scrubberBox = document.getElementById('use_scrubber');
+        const recyclerBox = document.getElementById('use_recycler');
+
+        document.getElementById('scrubber-fields').style.display = scrubberBox.checked ? 'block' : 'none';
+        document.getElementById('recycler-fields').style.display = recyclerBox.checked ? 'block' : 'none';
+    }
     </script>
     
 

@@ -205,8 +205,6 @@ SYSTEM_PROMPT = """
     If the user asks for a tool that doesn't exist, say "I'm sorry, Dave, I'm afraid I can't do that."
 
     To search the internet, use tavily search tool.
-
-    Remember, NEVER use a scrubber AND a recycler (water recycler is fine and different than reycler); they are mutually exclusive.
     """
 # Global memory dictionary (very basic short-term memory)
 '''memory = {
