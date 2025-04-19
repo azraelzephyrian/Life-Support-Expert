@@ -21,7 +21,6 @@ from medical_expert import SpaceMedicalExpertSystem
 from experta import Fact
 
 load_dotenv()
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 # Call this early in app.py (e.g., after defining your app object)
 

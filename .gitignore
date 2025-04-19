@@ -1,1 +1,123 @@
+# Environment variables and secrets
 .env
+.env.*
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+.venv
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+*.sql
+db.json
+
+# Docker
+.dockerignore
+
+# Logs and temp files
+*.log
+*.tmp
+*.out
+logs/
+tmp/
+.coverage
+htmlcov/
+.pytest_cache/
+coverage/
+.tox/
+nosetests.xml
+coverage.xml
+*.cover
+
+# Flask stuff
+instance/
+.webassets-cache
+.flask_session/
+
+# Jupyter Notebooks
+.ipynb_checkpoints
+*.ipynb
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# OS specific files
+## macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+Icon
+
+## Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msm
+*.msp
+
+# Archives
+*.7z
+*.jar
+*.rar
+*.zip
+*.gz
+*.tgz
+*.bzip
+*.bz2
+*.xz
+*.lzma
+
+# SSL/Encryption
+*.pem
+*.cert
+*.crt
+*.key
+*.p12
+*.jks
+*.keystore
+*.pub
+*.priv
+*.asc
+*.gpg
+*.sig
+
+# Project-specific files
+memory_store.json
+uploads/
+data/

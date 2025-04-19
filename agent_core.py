@@ -1,5 +1,5 @@
 # agent_core.py
-
+import openai
 from openai import OpenAI
 from toolkit import tools
 from sandbox import safe_exec
@@ -10,7 +10,14 @@ from db_utils import fetch_all_records
 
 
 load_dotenv()
-client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+if os.environ.get("OPENAI_API_KEY"):
+    client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+elif os.environ.get("GROQ_API_KEY"):
+    client = openai.OpenAI(
+        base_url="https://api.groq.com/openai/v1",
+        api_key=os.environ.get("GROQ_API_KEY"),
+    )
+
 
 SYSTEM_PROMPT = """
     Your name is HAL 9000.
@@ -258,8 +265,8 @@ def run_agent(user_message: str):
     messages.append({"role": "user", "content": user_message})
 
     response = client.chat.completions.create(
-        model="gpt-4",
-        messages=messages  # <-- use the constructed list with memory!
+        model="llama-3.1-8b-instant",
+        messages=messages,  # <-- use the constructed list with memory!
     )
 
 
@@ -282,15 +289,34 @@ def run_agent(user_message: str):
     return full_reply
 
 
-
 def handle_tool(reply: str):
     import json
+    import traceback
+    
     try:
         tool_block = reply[len("tool:"):].strip()
+        
+        # Check if there's an opening parenthesis
+        if "(" not in tool_block:
+            return f"Error: Invalid tool format - missing opening parenthesis. Got: {tool_block}"
+        
         tool_name, args = tool_block.split("(", 1)
         tool_name = tool_name.strip()
+        
+        # Check if there's a closing parenthesis
+        if ")" not in args:
+            return f"Error: Invalid tool format - missing closing parenthesis. Got: {tool_block}"
+            
         args_json = args.rstrip(")").strip()
-        parsed_args = json.loads(args_json)
+        
+        # Add error handling for empty or malformed JSON
+        try:
+            if not args_json or args_json == "{}":
+                parsed_args = {}
+            else:
+                parsed_args = json.loads(args_json)
+        except json.JSONDecodeError:
+            return f"Error: Invalid JSON in tool arguments: {args_json}"
 
         if tool_name in tools:
             if isinstance(parsed_args, dict):
@@ -300,24 +326,29 @@ def handle_tool(reply: str):
             else:
                 result = tools[tool_name](parsed_args)  # fallback, should never hit
 
-
-            # 🔁 Store last tool call
+            # Store last tool call
             memory["last_tool"] = tool_name
             memory["last_tool_args"] = parsed_args
             memory["last_tool_result"] = result
+            
+            # Save memory to disk
+            save_memory(memory)
 
-            # 🧠 Special-case: remember nutrition facts
+            # Special-case: remember nutrition facts
             if tool_name == "search_facts" and "query" in parsed_args:
                 memory["last_nutrition_query"] = {
                     "item": parsed_args["query"],
                     "result": result
                 }
+                # Save updated memory
+                save_memory(memory)
 
-            return f"✅ Tool `{tool_name}` executed.\n\nResult: {result}"
+            return f"Tool `{tool_name}` executed.\n\nResult: {result}"
         else:
-            return f"❌ Unknown tool: {tool_name}"
+            return f"Unknown tool: {tool_name}"
     except Exception as e:
-        return f"⚠️ Error executing tool: {str(e)}"
+        stack_trace = traceback.format_exc()
+        return f"Error executing tool: {str(e)}\n\nDetails: {stack_trace}"
 
 
 def handle_code(reply: str):
